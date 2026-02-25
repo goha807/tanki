@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tanks Evolution Pro</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -15,16 +16,30 @@
     </div>
 
     <div id="gameUI" style="display:none">
+        <div id="pingDisplay">Ping: 0ms</div>
         <div id="topBar">
             <span id="stats">Монети: 0</span>
-            <button onclick="upgrade('speed_lvl')">Качати Швидкість (100)</button>
-            <button onclick="upgrade('fire_rate_lvl')">Качати КД (100)</button>
-            <input type="text" id="avatarUrl" placeholder="URL аватара" style="width:100px; display:inline">
+            <button onclick="upgrade('speed_lvl')">Швидкість</button>
+            <button onclick="upgrade('fire_rate_lvl')">КД</button>
+            <input type="text" id="avatarUrl" placeholder="URL фото" style="width:80px">
             <button onclick="setAvatar()">OK</button>
         </div>
+        
         <div id="leaderboard"></div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
-        
+
+        <div id="mobileControls">
+            <div class="dpad">
+                <button id="moveUp">↑</button>
+                <div>
+                    <button id="moveLeft">←</button>
+                    <button id="moveDown">↓</button>
+                    <button id="moveRight">→</button>
+                </div>
+            </div>
+            <button id="btnFire">FIRE</button>
+        </div>
+      
         <div id="respawnMenu" style="display:none">
             <h2>ТЕБЕ ЗНИЩЕНО!</h2>
             <button onclick="respawn()" style="font-size:24px">В БІЙ!</button>
