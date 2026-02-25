@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const MAP_SIZE = 2000;
-const OBS_SIZE = 50;
+const OBSTACLE_COUNT = 40;
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -27,16 +27,16 @@ let bullets = [];
 let healthPacks = [];
 let obstacles = [];
 
+// Створення перешкод
 function initObstacles() {
-    obstacles = [];
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < OBSTACLE_COUNT; i++) {
         obstacles.push({
             id: i,
-            x: Math.random() * (MAP_SIZE - OBS_SIZE),
-            y: Math.random() * (MAP_SIZE - OBS_SIZE),
+            x: Math.floor(Math.random() * (MAP_SIZE - 60) + 30),
+            y: Math.floor(Math.random() * (MAP_SIZE - 60) + 30),
             hp: 3,
-            isDestroyed: false,
-            respawnTime: 0
+            destroyed: false,
+            respawnTimer: 0
         });
     }
 }
@@ -48,16 +48,14 @@ setInterval(() => {
         io.emit('updateHealthPacks', healthPacks);
     }
     
-    let changed = false;
-    const now = Date.now();
-    obstacles.forEach(o => {
-        if (o.isDestroyed && now > o.respawnTime) {
-            o.isDestroyed = false;
-            o.hp = 3;
-            changed = true;
+    // Регенерація перешкод
+    obstacles.forEach(ob => {
+        if (ob.destroyed && Date.now() > ob.respawnTimer) {
+            ob.destroyed = false;
+            ob.hp = 3;
+            io.emit('updateObstacles', obstacles);
         }
     });
-    if (changed) io.emit('updateObstacles', obstacles);
 }, 5000);
 
 setInterval(() => {
@@ -66,22 +64,23 @@ setInterval(() => {
         b.dist = (b.dist || 0) + Math.sqrt(b.dx**2 + b.dy**2);
         const maxDist = 400 + (b.rangeLvl * 100);
 
-        if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE || b.dist > maxDist) {
-            bullets.splice(index, 1);
-            return;
-        }
-
-        for (let o of obstacles) {
-            if (!o.isDestroyed && b.x > o.x && b.x < o.x + OBS_SIZE && b.y > o.y && b.y < o.y + OBS_SIZE) {
-                o.hp -= 1;
-                bullets.splice(index, 1);
-                if (o.hp <= 0) {
-                    o.isDestroyed = true;
-                    o.respawnTime = Date.now() + 15000;
+        // Перевірка на зіткнення з перешкодами
+        for (let ob of obstacles) {
+            if (!ob.destroyed && b.x > ob.x && b.x < ob.x + 40 && b.y > ob.y && b.y < ob.y + 40) {
+                ob.hp--;
+                if (ob.hp <= 0) {
+                    ob.destroyed = true;
+                    ob.respawnTimer = Date.now() + 15000; // Реген через 15 сек
                 }
+                bullets.splice(index, 1);
                 io.emit('updateObstacles', obstacles);
                 return;
             }
+        }
+
+        if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE || b.dist > maxDist) {
+            bullets.splice(index, 1);
+            return;
         }
 
         for (let id in players) {
@@ -121,6 +120,50 @@ setInterval(() => {
     io.emit('updateBullets', bullets);
 }, 1000 / 60);
 
+// API та сокети залишаються такими ж, додаємо лише передачу перешкод при вході
+io.on('connection', (socket) => {
+    socket.emit('updateObstacles', obstacles); // Відправляємо блоки при підключенні
+
+    socket.on('joinGame', (user) => {
+        players[socket.id] = { id: socket.id, ...user, x: 100, y: 100, hp: 100, isDead: false };
+        io.emit('updatePlayers', players);
+    });
+
+    socket.on('move', (data) => { 
+        if (players[socket.id]) {
+            // Перевірка зіткнення з блоками при русі
+            let canMove = true;
+            for(let ob of obstacles) {
+                if(!ob.destroyed && data.x < ob.x + 40 && data.x + 30 > ob.x && data.y < ob.y + 40 && data.y + 30 > ob.y) {
+                    canMove = false; break;
+                }
+            }
+            if(canMove) Object.assign(players[socket.id], data); 
+            io.emit('updatePlayers', players); 
+        } 
+    });
+
+    socket.on('shoot', (data) => {
+        if (players[socket.id] && !players[socket.id].isDead) {
+            bullets.push({ ...data, owner: socket.id, rangeLvl: players[socket.id].range_lvl });
+        }
+    });
+
+    socket.on('respawn', () => {
+        if (players[socket.id]) {
+            players[socket.id].hp = 100;
+            players[socket.id].isDead = false;
+            players[socket.id].x = Math.random() * 500;
+            players[socket.id].y = Math.random() * 500;
+            io.emit('updatePlayers', players);
+        }
+    });
+
+    socket.on('disconnect', () => { delete players[socket.id]; io.emit('updatePlayers', players); });
+    socket.on('ping_server', () => socket.emit('pong_server'));
+});
+
+// Додай сюди свої app.post('/auth'...), app.post('/upgrade'...) з твого серверного коду без змін
 app.post('/auth', (req, res) => {
     const { username, password, type } = req.body;
     if (type === 'login') {
@@ -135,7 +178,6 @@ app.post('/auth', (req, res) => {
         });
     }
 });
-
 app.post('/upgrade', (req, res) => {
     const { username, stat } = req.body;
     db.query(`UPDATE users SET ${stat} = ${stat} + 1, coins = coins - 100 WHERE username = ? AND coins >= 100`, [username], (err, result) => {
@@ -143,52 +185,10 @@ app.post('/upgrade', (req, res) => {
         else res.json({ success: false });
     });
 });
-
-io.on('connection', (socket) => {
-    socket.on('joinGame', (user) => {
-        players[socket.id] = { 
-            id: socket.id, 
-            ...user, 
-            x: Math.random()*500, y: Math.random()*500, 
-            hp: 100, isDead: false 
-        };
-        socket.emit('updateObstacles', obstacles);
-        io.emit('updatePlayers', players);
-    });
-
-    socket.on('move', (data) => { 
-        if (players[socket.id]) { 
-            let collision = false;
-            for (let o of obstacles) {
-                if (!o.isDestroyed && data.x + 30 > o.x && data.x < o.x + OBS_SIZE && data.y + 30 > o.y && data.y < o.y + OBS_SIZE) {
-                    collision = true;
-                    break;
-                }
-            }
-            if (!collision) {
-                Object.assign(players[socket.id], data); 
-                io.emit('updatePlayers', players); 
-            }
-        } 
-    });
-
-    socket.on('shoot', (data) => {
-        if (players[socket.id] && !players[socket.id].isDead) {
-            bullets.push({ ...data, owner: socket.id, rangeLvl: players[socket.id].range_lvl });
-        }
-    });
-
-    socket.on('respawn', () => {
-        if (players[socket.id]) {
-            players[socket.id].hp = 100;
-            players[socket.id].isDead = false;
-            players[socket.id].x = Math.random() * (MAP_SIZE - 50);
-            players[socket.id].y = Math.random() * (MAP_SIZE - 50);
-            io.emit('updatePlayers', players);
-        }
-    });
-
-    socket.on('disconnect', () => { delete players[socket.id]; io.emit('updatePlayers', players); });
+app.post('/set-avatar', (req, res) => {
+    const { username, url } = req.body;
+    db.query('UPDATE users SET photo = ? WHERE username = ?', [url, username], () => res.json({ success: true }));
 });
 
-server.listen(PORT || 3000, '0.0.0.0');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on ${PORT}`));
