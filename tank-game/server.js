@@ -12,7 +12,6 @@ const MAP_SIZE = 2000;
 app.use(express.static('public'));
 app.use(express.json());
 
-// Підключення до бази даних Railway
 const db = mysql.createConnection({
     host: process.env.MYSQLHOST,
     user: process.env.MYSQLUSER,
@@ -23,7 +22,7 @@ const db = mysql.createConnection({
 
 db.connect(err => {
     if (err) {
-        console.error('Помилка БД:', err);
+        console.error('Помилка БД (перевірте змінні Variables в Railway):', err);
     } else {
         console.log('Успішно підключено до бази даних Railway!');
     }
@@ -33,7 +32,6 @@ let players = {};
 let bullets = [];
 let healthPacks = [];
 
-// Створення аптечок
 setInterval(() => {
     if (healthPacks.length < 20) {
         healthPacks.push({ id: Math.random(), x: Math.random() * MAP_SIZE, y: Math.random() * MAP_SIZE });
@@ -42,7 +40,6 @@ setInterval(() => {
 }, 5000);
 
 setInterval(() => {
-    // Логіка куль
     bullets.forEach((b, index) => {
         b.x += b.dx; b.y += b.dy;
         if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE) {
@@ -55,10 +52,11 @@ setInterval(() => {
                 p.hp -= 20;
                 bullets.splice(index, 1);
                 if (p.hp <= 0) {
-                    // ВИПАДКОВИЙ РЕСПАВН ПРИ СМЕРТІ
-                    p.hp = 100; 
-                    p.x = Math.random() * (MAP_SIZE - 50); 
-                    p.y = Math.random() * (MAP_SIZE - 50);
+                    // РАНДОМНИЙ РЕСПАВН ПРИ СМЕРТІ
+                    p.hp = 100;
+                    p.x = Math.random() * (MAP_SIZE - 60) + 30;
+                    p.y = Math.random() * (MAP_SIZE - 60) + 30;
+                    
                     if (players[b.owner]) {
                         players[b.owner].score += 10;
                         db.query('UPDATE users SET score = score + 10 WHERE username = ?', [players[b.owner].username]);
@@ -70,7 +68,6 @@ setInterval(() => {
         }
     });
 
-    // Перевірка аптечок
     for (let id in players) {
         let p = players[id];
         healthPacks.forEach((hp, idx) => {
@@ -107,8 +104,8 @@ io.on('connection', (socket) => {
         players[socket.id] = { 
             id: socket.id, 
             username: user.username, 
-            x: Math.random()*500, 
-            y: Math.random()*500, 
+            x: Math.random() * (MAP_SIZE - 100), 
+            y: Math.random() * (MAP_SIZE - 100), 
             hp: 100, 
             score: user.score || 0,
             speed: 4,         // Початкова швидкість
@@ -122,7 +119,7 @@ io.on('connection', (socket) => {
         if (players[socket.id]) { 
             players[socket.id].x = data.x;
             players[socket.id].y = data.y;
-            // Транслюємо позицію всім, крім відправника, щоб не було дьоргання
+            // Відправляємо іншим, але не повертаємо самому собі, щоб не дьоргало
             socket.broadcast.emit('updatePlayers', players); 
         } 
     });
@@ -130,20 +127,21 @@ io.on('connection', (socket) => {
     socket.on('shoot', (data) => {
         const p = players[socket.id];
         const now = Date.now();
+        // Перевірка КД на сервері
         if (p && now - p.lastShot > p.cooldown) {
             bullets.push({ ...data, owner: socket.id });
             p.lastShot = now;
         }
     });
 
-    // Система покращення рівнів
+    // Купівля покращень
     socket.on('upgrade', (type) => {
         const p = players[socket.id];
         if (p && p.score >= 50) {
             if (type === 'speed' && p.speed < 10) {
                 p.speed += 0.8;
                 p.score -= 50;
-            } else if (type === 'cooldown' && p.cooldown > 150) {
+            } else if (type === 'cooldown' && p.cooldown > 100) {
                 p.cooldown -= 80;
                 p.score -= 50;
             }
@@ -159,5 +157,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Сервер запущено на порту ${PORT}`);
+    console.log(`Сервер працює на порті ${PORT}`);
 });
