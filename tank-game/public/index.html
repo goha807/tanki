@@ -7,12 +7,29 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="loginPanel">
-        <h1>TANKS.IO</h1>
-        <input type="text" id="username" placeholder="Нікнейм">
-        <input type="password" id="password" placeholder="Пароль">
-        <button onclick="auth('login')">Вхід</button>
-        <button onclick="auth('register')" style="background:#555">Реєстрація</button>
+    <div id="authContainer">
+        <div id="loginPanel">
+            <h1>TANKS.IO</h1>
+            <div class="input-group">
+                <input type="text" id="username" placeholder="Нікнейм">
+                <input type="password" id="password" placeholder="Пароль">
+            </div>
+            <div class="button-group">
+                <button onclick="auth('login')">Вхід</button>
+                <button onclick="auth('register')" style="background:#555">Реєстрація</button>
+            </div>
+            
+            <div id="aboutGame">
+                <h3>Про гру</h3>
+                <p>Ласкаво просимо в <b>Tanks Evolution Pro</b>! Це динамічний шутер, де твоя мета — вижити та стати найсильнішим на арені.</p>
+                <ul>
+                    <li>Збирай монети за знищення ворогів.</li>
+                    <li>Прокачуй швидкість та скорострільність.</li>
+                    <li>Руйнуй стіни (3 постріли), щоб прокласти шлях.</li>
+                    <li>Шукай білі аптечки для відновлення HP.</li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <div id="gameUI" style="display:none">
@@ -26,20 +43,10 @@
         </div>
         
         <div id="leaderboard"></div>
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-
-        <div id="mobileControls">
-            <div class="dpad">
-                <button id="moveUp">↑</button>
-                <div>
-                    <button id="moveLeft">←</button>
-                    <button id="moveDown">↓</button>
-                    <button id="moveRight">→</button>
-                </div>
-            </div>
-            <button id="btnFire">FIRE</button>
+        <div id="canvasWrapper">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
         </div>
-      
+
         <div id="respawnMenu" style="display:none">
             <h2>ТЕБЕ ЗНИЩЕНО!</h2>
             <button onclick="respawn()" style="font-size:24px">В БІЙ!</button>
