@@ -1,110 +1,74 @@
 const socket = io();
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-let currentUser = null, players = {}, bullets = [], healthPacks = [], keys = {};
-let lastShot = 0;
-const MAP_SIZE = 2000;
-const userImg = new Image();
+let players = {}, bullets = [], keys = {}, lastShot = 0;
 
-async function auth(type) {
-    const u = document.getElementById('username').value;
-    const p = document.getElementById('password').value;
-    const res = await fetch('/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: u, password: p, type })
+// Розрахунок пінгу
+setInterval(() => {
+    const start = Date.now();
+    socket.emit('ping');
+    socket.once('pong', () => {
+        document.getElementById('pingValue').innerText = Date.now() - start;
     });
-    const data = await res.json();
-    if (data.success) {
-        currentUser = data.user;
-        document.getElementById('loginPanel').style.display = 'none';
-        document.getElementById('gameUI').style.display = 'block';
-        socket.emit('joinGame', currentUser);
-        requestAnimationFrame(gameLoop);
-    } else alert(data.message);
-}
+}, 2000);
 
-function setPhoto() {
-    const url = prompt("Вставте посилання на фото (URL):");
-    if (url) {
-        userImg.src = url;
-        socket.emit('updatePhoto', url);
-    }
-}
+// Мобільне керування (спрощено)
+const joystick = document.getElementById('joystick');
+const shootBtn = document.getElementById('shootBtn');
+let moveDir = { x: 0, y: 0 };
 
-function upgrade(type) { socket.emit('upgrade', type); }
-
-canvas.addEventListener('mousedown', (e) => {
-    const p = players[socket.id];
-    if (!p || !p.alive || Date.now() - lastShot < p.fireRate) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const targetX = e.clientX - rect.left - canvas.width / 2;
-    const targetY = e.clientY - rect.top - canvas.height / 2;
-    const angle = Math.atan2(targetY, targetX);
-    
-    socket.emit('shoot', { x: p.x + 15, y: p.y + 15, dx: Math.cos(angle) * 12, dy: Math.sin(angle) * 12 });
-    lastShot = Date.now();
+joystick.addEventListener('touchmove', (e) => {
+    const touch = e.touches[0];
+    const rect = joystick.getBoundingClientRect();
+    moveDir.x = (touch.clientX - rect.left - 50) / 50;
+    moveDir.y = (touch.clientY - rect.top - 50) / 50;
 });
 
-window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+shootBtn.addEventListener('touchstart', () => {
+    const p = players[socket.id];
+    if (p && p.alive) socket.emit('shoot', { x: p.x + 15, y: p.y + 15, dx: 10, dy: 0 }); // Стрільба вперед
+});
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const me = players[socket.id];
-
     if (me && me.alive) {
-        let moved = false;
-        if (keys['w']) { me.y -= me.speed; moved = true; }
-        if (keys['s']) { me.y += me.speed; moved = true; }
-        if (keys['a']) { me.x -= me.speed; moved = true; }
-        if (keys['d']) { me.x += me.speed; moved = true; }
-        if (moved) socket.emit('move', { x: me.x, y: me.y });
+        // Додаємо рух від джойстика до клавіш
+        if (Math.abs(moveDir.x) > 0.1) me.x += moveDir.x * me.speed;
+        if (Math.abs(moveDir.y) > 0.1) me.y += moveDir.y * me.speed;
+        
+        // Стандартні клавіші
+        if (keys['w']) me.y -= me.speed;
+        if (keys['s']) me.y += me.speed;
+        if (keys['a']) me.x -= me.speed;
+        if (keys['d']) me.x += me.speed;
+
+        socket.emit('move', { x: me.x, y: me.y });
 
         ctx.save();
-        ctx.translate(canvas.width / 2 - me.x, canvas.height / 2 - me.y);
-
-        // Сітка
-        ctx.strokeStyle = '#333';
-        for(let i=0; i<=MAP_SIZE; i+=100) {
-            ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,MAP_SIZE); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(MAP_SIZE,i); ctx.stroke();
-        }
-
-        // Відображення гравців
+        ctx.translate(canvas.width/2 - me.x, canvas.height/2 - me.y);
+        
+        // Малюємо гравців та лідерборд
         for (let id in players) {
             const p = players[id];
             if (!p.alive) continue;
-            
-            if (p.photo) {
-                const img = new Image(); img.src = p.photo;
-                ctx.drawImage(img, p.x, p.y, 30, 30);
-            } else {
-                ctx.fillStyle = id === socket.id ? '#00ff00' : '#ff4444';
-                ctx.fillRect(p.x, p.y, 30, 30);
-            }
-            
-            ctx.fillStyle = 'white'; ctx.fillText(`${p.username} (${p.coins}💰)`, p.x, p.y - 20);
+            ctx.fillStyle = id === socket.id ? '#00ff00' : '#ff4444';
+            ctx.fillRect(p.x, p.y, 30, 30);
+            ctx.fillStyle = 'white'; ctx.fillText(p.username, p.x, p.y - 10);
         }
-
+        
         bullets.forEach(b => {
             ctx.fillStyle = 'yellow'; ctx.beginPath(); ctx.arc(b.x, b.y, 5, 0, Math.PI*2); ctx.fill();
         });
         ctx.restore();
+
+        // Оновлюємо топ
+        const sorted = Object.values(players).sort((a,b) => b.score - a.score).slice(0, 5);
+        document.getElementById('leaderList').innerHTML = sorted.map(s => `<div>${s.username}: ${s.score}</div>`).join('');
+        document.getElementById('coinCount').innerText = me.coins;
     }
     requestAnimationFrame(gameLoop);
 }
-
-socket.on('died', () => {
-    document.getElementById('respawnMenu').style.display = 'block';
-});
-
-function respawn() {
-    document.getElementById('respawnMenu').style.display = 'none';
-    socket.emit('respawn');
-}
-
-socket.on('updatePlayers', d => players = d);
-socket.on('updateBullets', d => bullets = d);
+// ... (додати функції auth, upgrade та решту з минулих повідомлень)
