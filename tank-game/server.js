@@ -184,5 +184,10 @@ app.post('/upgrade', (req, res) => {
     });
 });
 
+app.post('/set-avatar', (req, res) => {
+    const { username, url } = req.body;
+    db.query('UPDATE users SET photo = ? WHERE username = ?', [url, username], () => res.json({ success: true }));
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Server running on ${PORT}`));
