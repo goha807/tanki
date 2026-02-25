@@ -2,8 +2,53 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Tanks Evolution</title>
+    <title>Tanks Evolution - Pro Edition</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Додаткові стилі для нових елементів */
+        #shop {
+            position: fixed;
+            left: 20px;
+            top: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+        .shop-btn {
+            font-size: 12px;
+            padding: 8px;
+            margin: 0;
+        }
+        #respawnMenu {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            text-align: center;
+            border: 5px solid red;
+            border-radius: 20px;
+            z-index: 1000;
+        }
+        #respawnMenu h2 {
+            color: red;
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+        .coins-display {
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+    </style>
 </head>
 <body>
     <div id="loginPanel">
@@ -15,8 +60,22 @@
     </div>
 
     <div id="gameUI" style="display:none">
+        <div id="shop">
+            <div class="coins-display">💰 Монети: <span id="coinCount">0</span></div>
+            <button class="shop-btn" onclick="upgrade('speed')">⚡ Швидкість (100💰)</button>
+            <button class="shop-btn" onclick="upgrade('fireRate')">🔥 Скорострільність (100💰)</button>
+            <button class="shop-btn" onclick="upgrade('range')">🎯 Дальність (100💰)</button>
+            <button class="shop-btn" onclick="setPhoto()" style="background:#0056b3">🖼️ Поставити фото</button>
+        </div>
+
         <div id="leaderboard"></div>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <div id="respawnMenu">
+        <h2>ТЕБЕ ВБИТО!</h2>
+        <p>Не здавайся, спробуй ще раз!</p>
+        <button onclick="respawn()" style="background: red; padding: 15px 30px; font-size: 20px;">ГРАТИ ЗНОВУ</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
