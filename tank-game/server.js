@@ -12,15 +12,21 @@ const MAP_SIZE = 2000; // Велика карта
 app.use(express.static('public'));
 app.use(express.json());
 
+// Підключення до бази даних Railway через змінні оточення
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'tank_game'
+    host: process.env.MYSQLHOST,
+    user: process.env.MYSQLUSER,
+    password: process.env.MYSQLPASSWORD,
+    database: process.env.MYSQLDATABASE,
+    port: process.env.MYSQLPORT || 3306
 });
 
 db.connect(err => {
-    if (err) console.error('Помилка БД:', err);
+    if (err) {
+        console.error('Помилка БД (перевірте змінні Variables в Railway):', err);
+    } else {
+        console.log('Успішно підключено до бази даних Railway!');
+    }
 });
 
 let players = {};
@@ -83,11 +89,11 @@ app.post('/auth', (req, res) => {
     if (type === 'login') {
         db.query('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, results) => {
             if (results && results.length > 0) res.json({ success: true, user: results[0] });
-            else res.json({ success: false, message: 'Помилка входу' });
+            else res.json({ success: false, message: 'Помилка входу або невірні дані' });
         });
     } else {
         db.query('INSERT INTO users (username, password, score) VALUES (?, ?, 0)', [username, password], (err) => {
-            if (err) res.json({ success: false, message: 'Нік зайнятий' });
+            if (err) res.json({ success: false, message: 'Цей нікнейм вже зайнятий' });
             else res.json({ success: true, user: { username, score: 0 } });
         });
     }
@@ -103,4 +109,8 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => { delete players[socket.id]; io.emit('updatePlayers', players); });
 });
 
-server.listen(3000, () => console.log('Запущено на http://localhost:3000'));
+// Використання порту, який надає Railway
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Сервер танків запущено на порту ${PORT}`);
+});
