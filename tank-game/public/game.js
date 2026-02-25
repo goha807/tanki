@@ -23,7 +23,7 @@ setInterval(() => {
 async function auth(type) {
     const u = document.getElementById('username').value;
     const p = document.getElementById('password').value;
-    if(!u || !p) return alert("Введіть дані!");
+    if(!u || !p) return alert("Введіть нік та пароль!");
     
     const res = await fetch('/auth', {
         method: 'POST',
@@ -109,8 +109,11 @@ function gameLoop() {
         ctx.restore();
         
         document.getElementById('stats').innerText = `Монети: ${currentUser.coins} | Швидкість Lvl: ${me.speed_lvl} | КД Lvl: ${me.fire_rate_lvl}`;
+        document.getElementById('pingDisplay').innerText = `Ping: ${ping}ms`;
         document.getElementById('respawnMenu').style.display = me.isDead ? 'block' : 'none';
     }
+    const sorted = Object.values(players).sort((a,b) => b.score - a.score).slice(0, 5);
+    document.getElementById('leaderboard').innerHTML = '<h3>TOP 5</h3>' + sorted.map(s => `<div>${s.username}: ${s.score}</div>`).join('');
     requestAnimationFrame(gameLoop);
 }
 
@@ -118,6 +121,7 @@ socket.on('updatePlayers', d => {
     for (let id in d) {
         if (id !== socket.id) players[id] = d[id];
         else {
+            if(!players[id]) players[id] = d[id];
             players[id].hp = d[id].hp;
             players[id].isDead = d[id].isDead;
             players[id].coins = d[id].coins;
@@ -145,3 +149,11 @@ async function upgrade(stat) {
 }
 
 function respawn() { socket.emit('respawn'); }
+function setAvatar() {
+    const url = document.getElementById('avatarUrl').value;
+    fetch('/set-avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser.username, url })
+    }).then(() => { currentUser.photo = url; });
+}
