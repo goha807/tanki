@@ -8,11 +8,11 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const MAP_SIZE = 2000;
-const OBSTACLE_COUNT = 40;
 
 app.use(express.static('public'));
 app.use(express.json());
 
+// Підключення до бази даних Railway
 const db = mysql.createConnection({
     host: process.env.MYSQLHOST,
     user: process.env.MYSQLUSER,
@@ -20,81 +20,48 @@ const db = mysql.createConnection({
     database: process.env.MYSQLDATABASE,
     port: process.env.MYSQLPORT || 3306
 });
-db.connect();
+
+db.connect(err => {
+    if (err) {
+        console.error('Помилка БД:', err);
+    } else {
+        console.log('Успішно підключено до бази даних Railway!');
+    }
+});
 
 let players = {};
 let bullets = [];
 let healthPacks = [];
-let obstacles = [];
 
-// Створення перешкод
-function initObstacles() {
-    for (let i = 0; i < OBSTACLE_COUNT; i++) {
-        obstacles.push({
-            id: i,
-            x: Math.floor(Math.random() * (MAP_SIZE - 60) + 30),
-            y: Math.floor(Math.random() * (MAP_SIZE - 60) + 30),
-            hp: 3,
-            destroyed: false,
-            respawnTimer: 0
-        });
-    }
-}
-initObstacles();
-
+// Створення аптечок
 setInterval(() => {
-    if (healthPacks.length < 25) {
+    if (healthPacks.length < 20) {
         healthPacks.push({ id: Math.random(), x: Math.random() * MAP_SIZE, y: Math.random() * MAP_SIZE });
         io.emit('updateHealthPacks', healthPacks);
     }
-    
-    // Регенерація перешкод
-    obstacles.forEach(ob => {
-        if (ob.destroyed && Date.now() > ob.respawnTimer) {
-            ob.destroyed = false;
-            ob.hp = 3;
-            io.emit('updateObstacles', obstacles);
-        }
-    });
 }, 5000);
 
 setInterval(() => {
+    // Логіка куль
     bullets.forEach((b, index) => {
         b.x += b.dx; b.y += b.dy;
-        b.dist = (b.dist || 0) + Math.sqrt(b.dx**2 + b.dy**2);
-        const maxDist = 400 + (b.rangeLvl * 100);
-
-        // Перевірка на зіткнення з перешкодами
-        for (let ob of obstacles) {
-            if (!ob.destroyed && b.x > ob.x && b.x < ob.x + 40 && b.y > ob.y && b.y < ob.y + 40) {
-                ob.hp--;
-                if (ob.hp <= 0) {
-                    ob.destroyed = true;
-                    ob.respawnTimer = Date.now() + 15000; // Реген через 15 сек
-                }
-                bullets.splice(index, 1);
-                io.emit('updateObstacles', obstacles);
-                return;
-            }
-        }
-
-        if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE || b.dist > maxDist) {
+        if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE) {
             bullets.splice(index, 1);
             return;
         }
-
         for (let id in players) {
             let p = players[id];
-            if (!p.isDead && id !== b.owner && b.x > p.x && b.x < p.x + 30 && b.y > p.y && b.y < p.y + 30) {
+            if (id !== b.owner && b.x > p.x && b.x < p.x + 30 && b.y > p.y && b.y < p.y + 30) {
                 p.hp -= 20;
                 bullets.splice(index, 1);
                 if (p.hp <= 0) {
-                    p.hp = 0;
-                    p.isDead = true;
+                    // ВИПАДКОВИЙ РЕСПАВН ПРИ СМЕРТІ
+                    p.hp = 100; 
+                    p.x = Math.random() * (MAP_SIZE - 50); 
+                    p.y = Math.random() * (MAP_SIZE - 50);
                     if (players[b.owner]) {
                         players[b.owner].score += 10;
-                        players[b.owner].coins += 50;
-                        db.query('UPDATE users SET score = score + 10, coins = coins + 50 WHERE username = ?', [players[b.owner].username]);
+                        db.query('UPDATE users SET score = score + 10 WHERE username = ?', [players[b.owner].username]);
                     }
                 }
                 io.emit('updatePlayers', players);
@@ -103,9 +70,9 @@ setInterval(() => {
         }
     });
 
+    // Перевірка аптечок
     for (let id in players) {
         let p = players[id];
-        if (p.isDead) continue;
         healthPacks.forEach((hp, idx) => {
             if (p.x < hp.x + 20 && p.x + 30 > hp.x && p.y < hp.y + 20 && p.y + 30 > hp.y) {
                 if (p.hp < 100) {
@@ -120,75 +87,77 @@ setInterval(() => {
     io.emit('updateBullets', bullets);
 }, 1000 / 60);
 
-// API та сокети залишаються такими ж, додаємо лише передачу перешкод при вході
-io.on('connection', (socket) => {
-    socket.emit('updateObstacles', obstacles); // Відправляємо блоки при підключенні
-
-    socket.on('joinGame', (user) => {
-        players[socket.id] = { id: socket.id, ...user, x: 100, y: 100, hp: 100, isDead: false };
-        io.emit('updatePlayers', players);
-    });
-
-    socket.on('move', (data) => { 
-        if (players[socket.id]) {
-            // Перевірка зіткнення з блоками при русі
-            let canMove = true;
-            for(let ob of obstacles) {
-                if(!ob.destroyed && data.x < ob.x + 40 && data.x + 30 > ob.x && data.y < ob.y + 40 && data.y + 30 > ob.y) {
-                    canMove = false; break;
-                }
-            }
-            if(canMove) Object.assign(players[socket.id], data); 
-            io.emit('updatePlayers', players); 
-        } 
-    });
-
-    socket.on('shoot', (data) => {
-        if (players[socket.id] && !players[socket.id].isDead) {
-            bullets.push({ ...data, owner: socket.id, rangeLvl: players[socket.id].range_lvl });
-        }
-    });
-
-    socket.on('respawn', () => {
-        if (players[socket.id]) {
-            players[socket.id].hp = 100;
-            players[socket.id].isDead = false;
-            players[socket.id].x = Math.random() * 500;
-            players[socket.id].y = Math.random() * 500;
-            io.emit('updatePlayers', players);
-        }
-    });
-
-    socket.on('disconnect', () => { delete players[socket.id]; io.emit('updatePlayers', players); });
-    socket.on('ping_server', () => socket.emit('pong_server'));
-});
-
-// Додай сюди свої app.post('/auth'...), app.post('/upgrade'...) з твого серверного коду без змін
 app.post('/auth', (req, res) => {
     const { username, password, type } = req.body;
     if (type === 'login') {
         db.query('SELECT * FROM users WHERE username = ? AND password = ?', [username, password], (err, results) => {
             if (results && results.length > 0) res.json({ success: true, user: results[0] });
-            else res.json({ success: false, message: 'Помилка входу' });
+            else res.json({ success: false, message: 'Помилка входу або невірні дані' });
         });
     } else {
-        db.query('INSERT INTO users (username, password) VALUES (?, ?)', [username, password], (err) => {
-            if (err) res.json({ success: false, message: 'Нік зайнятий' });
-            else res.json({ success: true, user: { username, score: 0, coins: 0, speed_lvl: 1, range_lvl: 1, fire_rate_lvl: 1, photo: null } });
+        db.query('INSERT INTO users (username, password, score) VALUES (?, ?, 0)', [username, password], (err) => {
+            if (err) res.json({ success: false, message: 'Цей нікнейм вже зайнятий' });
+            else res.json({ success: true, user: { username, score: 0 } });
         });
     }
 });
-app.post('/upgrade', (req, res) => {
-    const { username, stat } = req.body;
-    db.query(`UPDATE users SET ${stat} = ${stat} + 1, coins = coins - 100 WHERE username = ? AND coins >= 100`, [username], (err, result) => {
-        if (result && result.affectedRows > 0) res.json({ success: true });
-        else res.json({ success: false });
+
+io.on('connection', (socket) => {
+    socket.on('joinGame', (user) => {
+        players[socket.id] = { 
+            id: socket.id, 
+            username: user.username, 
+            x: Math.random()*500, 
+            y: Math.random()*500, 
+            hp: 100, 
+            score: user.score || 0,
+            speed: 4,         // Початкова швидкість
+            cooldown: 600,    // Початкове КД (мс)
+            lastShot: 0
+        };
+        io.emit('updatePlayers', players);
     });
-});
-app.post('/set-avatar', (req, res) => {
-    const { username, url } = req.body;
-    db.query('UPDATE users SET photo = ? WHERE username = ?', [url, username], () => res.json({ success: true }));
+
+    socket.on('move', (data) => { 
+        if (players[socket.id]) { 
+            players[socket.id].x = data.x;
+            players[socket.id].y = data.y;
+            // Транслюємо позицію всім, крім відправника, щоб не було дьоргання
+            socket.broadcast.emit('updatePlayers', players); 
+        } 
+    });
+
+    socket.on('shoot', (data) => {
+        const p = players[socket.id];
+        const now = Date.now();
+        if (p && now - p.lastShot > p.cooldown) {
+            bullets.push({ ...data, owner: socket.id });
+            p.lastShot = now;
+        }
+    });
+
+    // Система покращення рівнів
+    socket.on('upgrade', (type) => {
+        const p = players[socket.id];
+        if (p && p.score >= 50) {
+            if (type === 'speed' && p.speed < 10) {
+                p.speed += 0.8;
+                p.score -= 50;
+            } else if (type === 'cooldown' && p.cooldown > 150) {
+                p.cooldown -= 80;
+                p.score -= 50;
+            }
+            io.emit('updatePlayers', players);
+        }
+    });
+
+    socket.on('disconnect', () => { 
+        delete players[socket.id]; 
+        io.emit('updatePlayers', players); 
+    });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => console.log(`Server running on ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Сервер запущено на порту ${PORT}`);
+});
