@@ -37,8 +37,6 @@ setInterval(() => {
     bullets.forEach((b, index) => {
         b.x += b.dx; b.y += b.dy;
         b.dist = (b.dist || 0) + Math.sqrt(b.dx**2 + b.dy**2);
-
-        // Дальність польоту залежить від прокачки
         const maxDist = 400 + (b.rangeLvl * 100);
         if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE || b.dist > maxDist) {
             bullets.splice(index, 1);
@@ -55,7 +53,7 @@ setInterval(() => {
                     p.isDead = true;
                     if (players[b.owner]) {
                         players[b.owner].score += 10;
-                        players[b.owner].coins += 50; // +50 монет за кіл
+                        players[b.owner].coins += 50;
                         db.query('UPDATE users SET score = score + 10, coins = coins + 50 WHERE username = ?', [players[b.owner].username]);
                     }
                 }
@@ -92,26 +90,29 @@ app.post('/auth', (req, res) => {
     } else {
         db.query('INSERT INTO users (username, password) VALUES (?, ?)', [username, password], (err) => {
             if (err) res.json({ success: false, message: 'Нік зайнятий' });
-            else res.json({ success: true, user: { username, score: 0, coins: 0, speed_lvl: 1, range_lvl: 1, fire_rate_lvl: 1 } });
+            else res.json({ success: true, user: { username, score: 0, coins: 0, speed_lvl: 1, range_lvl: 1, fire_rate_lvl: 1, photo: null } });
         });
     }
 });
 
 app.post('/upgrade', (req, res) => {
     const { username, stat } = req.body;
-    const costs = { speed_lvl: 100, range_lvl: 100, fire_rate_lvl: 100 };
     db.query(`UPDATE users SET ${stat} = ${stat} + 1, coins = coins - 100 WHERE username = ? AND coins >= 100`, [username], (err, result) => {
-        if (result.affectedRows > 0) res.json({ success: true });
+        if (result && result.affectedRows > 0) res.json({ success: true });
         else res.json({ success: false });
     });
 });
 
 app.post('/set-avatar', (req, res) => {
     const { username, url } = req.body;
-    db.query('UPDATE users SET avatar_url = ? WHERE username = ?', [url, username], () => res.json({ success: true }));
+    // Змінено avatar_url на photo згідно скріншоту
+    db.query('UPDATE users SET photo = ? WHERE username = ?', [url, username], () => res.json({ success: true }));
 });
 
 io.on('connection', (socket) => {
+    // Система пінгу
+    socket.on('ping_server', () => socket.emit('pong_server'));
+
     socket.on('joinGame', (user) => {
         players[socket.id] = { 
             id: socket.id, 
@@ -121,12 +122,20 @@ io.on('connection', (socket) => {
         };
         io.emit('updatePlayers', players);
     });
-    socket.on('move', (data) => { if (players[socket.id]) { Object.assign(players[socket.id], data); io.emit('updatePlayers', players); } });
+
+    socket.on('move', (data) => { 
+        if (players[socket.id]) { 
+            Object.assign(players[socket.id], data); 
+            io.emit('updatePlayers', players); 
+        } 
+    });
+
     socket.on('shoot', (data) => {
         if (players[socket.id] && !players[socket.id].isDead) {
             bullets.push({ ...data, owner: socket.id, rangeLvl: players[socket.id].range_lvl });
         }
     });
+
     socket.on('respawn', () => {
         if (players[socket.id]) {
             players[socket.id].hp = 100;
@@ -136,6 +145,7 @@ io.on('connection', (socket) => {
             io.emit('updatePlayers', players);
         }
     });
+
     socket.on('disconnect', () => { delete players[socket.id]; io.emit('updatePlayers', players); });
 });
 
