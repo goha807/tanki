@@ -1,57 +1,88 @@
-body { margin: 0; overflow: hidden; background: #222; font-family: sans-serif; color: white; }
+body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; }
 
-#pingDisplay {
-    position: absolute;
-    top: 50px;
-    left: 10px;
-    color: #0f0;
-    font-size: 12px;
-    z-index: 10;
-}
-
-#topBar {
-    position: absolute;
-    top: 0; left: 0; width: 100%;
-    background: rgba(0,0,0,0.7);
-    padding: 5px;
-    display: flex; gap: 5px; align-items: center; z-index: 10;
-}
-
-#leaderboard {
-    position: absolute;
-    top: 50px; right: 10px;
-    background: rgba(0,0,0,0.5);
-    padding: 10px; border-radius: 5px;
-}
-
-/* Мобільні кнопки */
-#mobileControls {
-    position: absolute;
-    bottom: 20px;
-    width: 100%;
+#authContainer {
     display: flex;
-    justify-content: space-between;
-    padding: 0 30px;
-    pointer-events: none;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: radial-gradient(circle, #333 0%, #111 100%);
+}
+
+#loginPanel {
+    background: rgba(0, 0, 0, 0.85);
+    padding: 40px;
+    border-radius: 20px;
+    border: 2px solid #444;
+    text-align: center;
+    width: 400px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+}
+
+#loginPanel h1 { font-size: 48px; color: #0f0; margin-bottom: 30px; text-shadow: 0 0 10px #0f0; }
+
+.input-group input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 5px;
+    border: none;
+    background: #222;
+    color: white;
     box-sizing: border-box;
 }
 
-#mobileControls button {
-    pointer-events: auto;
-    width: 60px; height: 60px;
-    background: rgba(255,255,255,0.2);
-    border: 2px solid white;
+.button-group button {
+    width: 48%;
+    padding: 12px;
+    margin: 10px 1%;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    background: #28a745;
     color: white;
-    border-radius: 50%;
     font-weight: bold;
 }
 
-.dpad { display: flex; flex-direction: column; align-items: center; }
-#btnFire { width: 80px !important; height: 80px !important; background: rgba(255,0,0,0.4) !important; }
+#aboutGame {
+    margin-top: 30px;
+    text-align: left;
+    font-size: 14px;
+    color: #ccc;
+    border-top: 1px solid #444;
+    padding-top: 20px;
+}
+
+#canvasWrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+#gameCanvas {
+    background: #000;
+    border: 3px solid #333;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    cursor: none; /* Ховаємо стандартний курсор, бо малюємо свій */
+}
+
+#topBar {
+    position: absolute; top: 0; left: 0; width: 100%;
+    background: rgba(0,0,0,0.8); padding: 10px;
+    display: flex; gap: 15px; align-items: center; z-index: 10;
+}
+
+#pingDisplay { position: absolute; top: 60px; left: 10px; color: #0f0; z-index: 10; }
+
+#leaderboard {
+    position: absolute; top: 60px; right: 20px;
+    background: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px;
+    min-width: 150px; border: 1px solid #444;
+}
 
 #respawnMenu {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.9); padding: 50px;
-    border: 5px solid red; text-align: center; border-radius: 20px;
+    background: rgba(0,0,0,0.95); padding: 60px;
+    border: 5px solid #ff4444; text-align: center; border-radius: 30px;
 }
