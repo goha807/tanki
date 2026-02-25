@@ -8,7 +8,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const MAP_SIZE = 2000;
-const OBSTACLE_SIZE = 60; // Розмір перешкоди
+const OBS_SIZE = 50;
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -20,7 +20,6 @@ const db = mysql.createConnection({
     database: process.env.MYSQLDATABASE,
     port: process.env.MYSQLPORT || 3306
 });
-
 db.connect();
 
 let players = {};
@@ -28,14 +27,13 @@ let bullets = [];
 let healthPacks = [];
 let obstacles = [];
 
-// Створюємо перешкоди
 function initObstacles() {
     obstacles = [];
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
         obstacles.push({
             id: i,
-            x: Math.random() * (MAP_SIZE - OBSTACLE_SIZE),
-            y: Math.random() * (MAP_SIZE - OBSTACLE_SIZE),
+            x: Math.random() * (MAP_SIZE - OBS_SIZE),
+            y: Math.random() * (MAP_SIZE - OBS_SIZE),
             hp: 3,
             isDestroyed: false,
             respawnTime: 0
@@ -49,14 +47,13 @@ setInterval(() => {
         healthPacks.push({ id: Math.random(), x: Math.random() * MAP_SIZE, y: Math.random() * MAP_SIZE });
         io.emit('updateHealthPacks', healthPacks);
     }
-
-    // Регенерація перешкод
+    
     let changed = false;
     const now = Date.now();
-    obstacles.forEach(ob => {
-        if (ob.isDestroyed && now > ob.respawnTime) {
-            ob.isDestroyed = false;
-            ob.hp = 3;
+    obstacles.forEach(o => {
+        if (o.isDestroyed && now > o.respawnTime) {
+            o.isDestroyed = false;
+            o.hp = 3;
             changed = true;
         }
     });
@@ -69,34 +66,32 @@ setInterval(() => {
         b.dist = (b.dist || 0) + Math.sqrt(b.dx**2 + b.dy**2);
         const maxDist = 400 + (b.rangeLvl * 100);
 
-        // Колізія з межами карти або дистанцією
         if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE || b.dist > maxDist) {
             bullets.splice(index, 1);
             return;
         }
 
-        // Колізія куль з перешкодами
-        for (let ob of obstacles) {
-            if (!ob.isDestroyed && b.x > ob.x && b.x < ob.x + OBSTACLE_SIZE && b.y > ob.y && b.y < ob.y + OBSTACLE_SIZE) {
-                ob.hp -= 1;
+        for (let o of obstacles) {
+            if (!o.isDestroyed && b.x > o.x && b.x < o.x + OBS_SIZE && b.y > o.y && b.y < o.y + OBS_SIZE) {
+                o.hp -= 1;
                 bullets.splice(index, 1);
-                if (ob.hp <= 0) {
-                    ob.isDestroyed = true;
-                    ob.respawnTime = Date.now() + 15000; // Респ через 15 сек
+                if (o.hp <= 0) {
+                    o.isDestroyed = true;
+                    o.respawnTime = Date.now() + 15000;
                 }
                 io.emit('updateObstacles', obstacles);
                 return;
             }
         }
 
-        // Колізія з гравцями
         for (let id in players) {
             let p = players[id];
             if (!p.isDead && id !== b.owner && b.x > p.x && b.x < p.x + 30 && b.y > p.y && b.y < p.y + 30) {
                 p.hp -= 20;
                 bullets.splice(index, 1);
                 if (p.hp <= 0) {
-                    p.hp = 0; p.isDead = true;
+                    p.hp = 0;
+                    p.isDead = true;
                     if (players[b.owner]) {
                         players[b.owner].score += 10;
                         players[b.owner].coins += 50;
@@ -109,53 +104,22 @@ setInterval(() => {
         }
     });
 
-    io.emit('updateBullets', bullets);
-}, 1000 / 60);
-
-io.on('connection', (socket) => {
-    socket.on('ping_server', () => socket.emit('pong_server'));
-
-    socket.on('joinGame', (user) => {
-        players[socket.id] = { id: socket.id, ...user, x: 100, y: 100, hp: 100, isDead: false };
-        socket.emit('updateObstacles', obstacles);
-        io.emit('updatePlayers', players);
-    });
-
-    socket.on('move', (data) => { 
-        if (players[socket.id]) { 
-            // Перевірка, щоб гравець не заїжджав у стіни
-            let canMove = true;
-            for (let ob of obstacles) {
-                if (!ob.isDestroyed && data.x + 30 > ob.x && data.x < ob.x + OBSTACLE_SIZE && data.y + 30 > ob.y && data.y < ob.y + OBSTACLE_SIZE) {
-                    canMove = false;
-                    break;
+    for (let id in players) {
+        let p = players[id];
+        if (p.isDead) continue;
+        healthPacks.forEach((hp, idx) => {
+            if (p.x < hp.x + 20 && p.x + 30 > hp.x && p.y < hp.y + 20 && p.y + 30 > hp.y) {
+                if (p.hp < 100) {
+                    p.hp = Math.min(100, p.hp + 40);
+                    healthPacks.splice(idx, 1);
+                    io.emit('updateHealthPacks', healthPacks);
+                    io.emit('updatePlayers', players);
                 }
             }
-            if (canMove) {
-                Object.assign(players[socket.id], data); 
-                io.emit('updatePlayers', players);
-            }
-        } 
-    });
-
-    socket.on('shoot', (data) => {
-        if (players[socket.id] && !players[socket.id].isDead) {
-            bullets.push({ ...data, owner: socket.id, rangeLvl: players[socket.id].range_lvl });
-        }
-    });
-
-    socket.on('respawn', () => {
-        if (players[socket.id]) {
-            players[socket.id].hp = 100;
-            players[socket.id].isDead = false;
-            players[socket.id].x = Math.random() * 500;
-            players[socket.id].y = Math.random() * 500;
-            io.emit('updatePlayers', players);
-        }
-    });
-
-    socket.on('disconnect', () => { delete players[socket.id]; io.emit('updatePlayers', players); });
-});
+        });
+    }
+    io.emit('updateBullets', bullets);
+}, 1000 / 60);
 
 app.post('/auth', (req, res) => {
     const { username, password, type } = req.body;
@@ -172,5 +136,59 @@ app.post('/auth', (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => console.log(`Server running on ${PORT}`));
+app.post('/upgrade', (req, res) => {
+    const { username, stat } = req.body;
+    db.query(`UPDATE users SET ${stat} = ${stat} + 1, coins = coins - 100 WHERE username = ? AND coins >= 100`, [username], (err, result) => {
+        if (result && result.affectedRows > 0) res.json({ success: true });
+        else res.json({ success: false });
+    });
+});
+
+io.on('connection', (socket) => {
+    socket.on('joinGame', (user) => {
+        players[socket.id] = { 
+            id: socket.id, 
+            ...user, 
+            x: Math.random()*500, y: Math.random()*500, 
+            hp: 100, isDead: false 
+        };
+        socket.emit('updateObstacles', obstacles);
+        io.emit('updatePlayers', players);
+    });
+
+    socket.on('move', (data) => { 
+        if (players[socket.id]) { 
+            let collision = false;
+            for (let o of obstacles) {
+                if (!o.isDestroyed && data.x + 30 > o.x && data.x < o.x + OBS_SIZE && data.y + 30 > o.y && data.y < o.y + OBS_SIZE) {
+                    collision = true;
+                    break;
+                }
+            }
+            if (!collision) {
+                Object.assign(players[socket.id], data); 
+                io.emit('updatePlayers', players); 
+            }
+        } 
+    });
+
+    socket.on('shoot', (data) => {
+        if (players[socket.id] && !players[socket.id].isDead) {
+            bullets.push({ ...data, owner: socket.id, rangeLvl: players[socket.id].range_lvl });
+        }
+    });
+
+    socket.on('respawn', () => {
+        if (players[socket.id]) {
+            players[socket.id].hp = 100;
+            players[socket.id].isDead = false;
+            players[socket.id].x = Math.random() * (MAP_SIZE - 50);
+            players[socket.id].y = Math.random() * (MAP_SIZE - 50);
+            io.emit('updatePlayers', players);
+        }
+    });
+
+    socket.on('disconnect', () => { delete players[socket.id]; io.emit('updatePlayers', players); });
+});
+
+server.listen(PORT || 3000, '0.0.0.0');
