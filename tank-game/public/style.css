@@ -1,27 +1,57 @@
-#topBar {
+body { margin: 0; overflow: hidden; background: #222; font-family: sans-serif; color: white; }
+
+#pingDisplay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    background: rgba(0,0,0,0.7);
-    padding: 10px;
-    display: flex;
-    gap: 10px;
-    align-items: center;
+    top: 50px;
+    left: 10px;
+    color: #0f0;
+    font-size: 12px;
     z-index: 10;
 }
 
-#respawnMenu {
+#topBar {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.9);
-    padding: 50px;
-    border: 5px solid red;
-    text-align: center;
-    border-radius: 20px;
+    top: 0; left: 0; width: 100%;
+    background: rgba(0,0,0,0.7);
+    padding: 5px;
+    display: flex; gap: 5px; align-items: center; z-index: 10;
 }
 
-#topBar input { margin: 0; padding: 5px; width: 120px; font-size: 12px; }
-#topBar button { padding: 5px 10px; font-size: 12px; }
+#leaderboard {
+    position: absolute;
+    top: 50px; right: 10px;
+    background: rgba(0,0,0,0.5);
+    padding: 10px; border-radius: 5px;
+}
+
+/* Мобільні кнопки */
+#mobileControls {
+    position: absolute;
+    bottom: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 30px;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+#mobileControls button {
+    pointer-events: auto;
+    width: 60px; height: 60px;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid white;
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+}
+
+.dpad { display: flex; flex-direction: column; align-items: center; }
+#btnFire { width: 80px !important; height: 80px !important; background: rgba(255,0,0,0.4) !important; }
+
+#respawnMenu {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.9); padding: 50px;
+    border: 5px solid red; text-align: center; border-radius: 20px;
+}
