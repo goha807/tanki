@@ -45,7 +45,6 @@ setInterval(() => {
         healthPacks.push({ id: Math.random(), x: Math.random() * MAP_SIZE, y: Math.random() * MAP_SIZE });
         io.emit('updateHealthPacks', healthPacks);
     }
-    
     obstacles.forEach(ob => {
         if (ob.destroyed && Date.now() > ob.respawnTimer) {
             ob.destroyed = false;
@@ -183,11 +182,6 @@ app.post('/upgrade', (req, res) => {
         if (result && result.affectedRows > 0) res.json({ success: true });
         else res.json({ success: false });
     });
-});
-
-app.post('/set-avatar', (req, res) => {
-    const { username, url } = req.body;
-    db.query('UPDATE users SET photo = ? WHERE username = ?', [url, username], () => res.json({ success: true }));
 });
 
 const PORT = process.env.PORT || 3000;
