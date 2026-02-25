@@ -7,7 +7,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const MAP_SIZE = 2000;
-[cite_start]const OBSTACLE_COUNT = 40; [cite: 2, 3]
+const OBSTACLE_COUNT = 40;
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -19,7 +19,7 @@ const db = mysql.createConnection({
     database: process.env.MYSQLDATABASE,
     port: process.env.MYSQLPORT || 3306
 });
-[cite_start]db.connect(); [cite: 4]
+db.connect();
 
 let players = {};
 let bullets = [];
@@ -38,7 +38,7 @@ function initObstacles() {
         });
     }
 }
-[cite_start]initObstacles(); [cite: 5, 6, 7]
+initObstacles();
 
 setInterval(() => {
     if (healthPacks.length < 25) {
@@ -53,7 +53,7 @@ setInterval(() => {
             io.emit('updateObstacles', obstacles);
         }
     });
-[cite_start]}, 5000); [cite: 8]
+}, 5000);
 
 setInterval(() => {
     bullets.forEach((b, index) => {
@@ -97,7 +97,7 @@ setInterval(() => {
                 break;
             }
         }
-    [cite_start]}); [cite: 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    });
 
     for (let id in players) {
         let p = players[id];
@@ -114,13 +114,12 @@ setInterval(() => {
         });
     }
     io.emit('updateBullets', bullets);
-[cite_start]}, 1000 / 60); [cite: 19, 20, 21, 22]
+}, 1000 / 60);
 
 io.on('connection', (socket) => {
     socket.emit('updateObstacles', obstacles);
 
     socket.on('joinGame', (user) => {
-        // Рандомний спаун при вході
         const startX = Math.random() * (MAP_SIZE - 100) + 50;
         const startY = Math.random() * (MAP_SIZE - 100) + 50;
         players[socket.id] = { id: socket.id, ...user, x: startX, y: startY, hp: 100, isDead: false };
@@ -141,28 +140,27 @@ io.on('connection', (socket) => {
             }
             io.emit('updatePlayers', players); 
         } 
-    [cite_start]}); [cite: 23, 24, 25]
+    });
 
     socket.on('shoot', (data) => {
         if (players[socket.id] && !players[socket.id].isDead) {
             bullets.push({ ...data, owner: socket.id, rangeLvl: players[socket.id].range_lvl });
         }
-    [cite_start]}); [cite: 26]
+    });
 
     socket.on('respawn', () => {
         if (players[socket.id]) {
             players[socket.id].hp = 100;
             players[socket.id].isDead = false;
-            // Рандомний спаун по всій карті
             players[socket.id].x = Math.random() * (MAP_SIZE - 100) + 50;
             players[socket.id].y = Math.random() * (MAP_SIZE - 100) + 50;
             io.emit('updatePlayers', players);
         }
-    [cite_start]}); [cite: 27]
+    });
 
     socket.on('disconnect', () => { delete players[socket.id]; io.emit('updatePlayers', players); });
     socket.on('ping_server', () => socket.emit('pong_server'));
-[cite_start]}); [cite: 28]
+});
 
 app.post('/auth', (req, res) => {
     const { username, password, type } = req.body;
@@ -177,7 +175,7 @@ app.post('/auth', (req, res) => {
             else res.json({ success: true, user: { username, score: 0, coins: 0, speed_lvl: 1, range_lvl: 1, fire_rate_lvl: 1, photo: null } });
         });
     }
-[cite_start]}); [cite: 29, 30]
+});
 
 app.post('/upgrade', (req, res) => {
     const { username, stat } = req.body;
@@ -185,12 +183,12 @@ app.post('/upgrade', (req, res) => {
         if (result && result.affectedRows > 0) res.json({ success: true });
         else res.json({ success: false });
     });
-[cite_start]}); [cite: 31]
+});
 
 app.post('/set-avatar', (req, res) => {
     const { username, url } = req.body;
     db.query('UPDATE users SET photo = ? WHERE username = ?', [url, username], () => res.json({ success: true }));
-[cite_start]}); [cite: 32]
+});
 
 const PORT = process.env.PORT || 3000;
-[cite_start]server.listen(PORT, '0.0.0.0', () => console.log(`Server running on ${PORT}`)); [cite: 33]
+server.listen(PORT, '0.0.0.0', () => console.log(`Server running on ${PORT}`));
