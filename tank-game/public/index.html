@@ -2,80 +2,49 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Tanks Evolution - Pro Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tanks Evolution</title>
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* Додаткові стилі для нових елементів */
-        #shop {
-            position: fixed;
-            left: 20px;
-            top: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid #444;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 100;
-        }
-        .shop-btn {
-            font-size: 12px;
-            padding: 8px;
-            margin: 0;
-        }
-        #respawnMenu {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            padding: 40px;
-            text-align: center;
-            border: 5px solid red;
-            border-radius: 20px;
-            z-index: 1000;
-        }
-        #respawnMenu h2 {
-            color: red;
-            font-size: 40px;
-            margin-bottom: 20px;
-        }
-        .coins-display {
-            color: #ffd700;
-            font-weight: bold;
-            font-size: 18px;
-            margin-bottom: 5px;
-        }
-    </style>
 </head>
-<body>
+<body class="dark-theme">
     <div id="loginPanel">
-        <h1>TANKS.IO</h1>
+        <div class="logo">TANKS<span>.IO</span></div>
         <input type="text" id="username" placeholder="Нікнейм">
         <input type="password" id="password" placeholder="Пароль">
-        <button onclick="auth('login')">Вхід</button>
-        <button onclick="auth('register')" style="background:#555">Реєстрація</button>
+        <div class="auth-buttons">
+            <button class="primary-btn" onclick="auth('login')">ВХІД</button>
+            <button class="secondary-btn" onclick="auth('register')">РЕЄСТРАЦІЯ</button>
+        </div>
     </div>
 
     <div id="gameUI" style="display:none">
         <div id="shop">
-            <div class="coins-display">💰 Монети: <span id="coinCount">0</span></div>
-            <button class="shop-btn" onclick="upgrade('speed')">⚡ Швидкість (100💰)</button>
-            <button class="shop-btn" onclick="upgrade('fireRate')">🔥 Скорострільність (100💰)</button>
-            <button class="shop-btn" onclick="upgrade('range')">🎯 Дальність (100💰)</button>
-            <button class="shop-btn" onclick="setPhoto()" style="background:#0056b3">🖼️ Поставити фото</button>
+            <div class="coin-box">💰 <span id="coinCount">0</span></div>
+            <button onclick="upgrade('speed')">🏃 Скорість</button>
+            <button onclick="upgrade('fireRate')">🔫 Перезарядка</button>
+            <button onclick="setPhoto()">📸 Фотка</button>
         </div>
 
-        <div id="leaderboard"></div>
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="leaderboard">
+            <h3>ТОП ГРАВЦІВ</h3>
+            <div id="leaderList"></div>
+        </div>
+
+        <div id="pingStats">Ping: <span id="pingValue">0</span>ms</div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="mobileControls">
+            <div id="joystick"><div id="stick"></div></div>
+            <button id="shootBtn">FIRE</button>
+        </div>
     </div>
 
     <div id="respawnMenu">
-        <h2>ТЕБЕ ВБИТО!</h2>
-        <p>Не здавайся, спробуй ще раз!</p>
-        <button onclick="respawn()" style="background: red; padding: 15px 30px; font-size: 20px;">ГРАТИ ЗНОВУ</button>
+        <div class="respawn-box">
+            <h1>ЗНИЩЕНИЙ</h1>
+            <button onclick="respawn()">В БІЙ!</button>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
