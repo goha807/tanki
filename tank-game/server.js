@@ -7,7 +7,6 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 const MAP_SIZE = 2000;
 const OBSTACLE_COUNT = 40;
-const TANK_SIZE = 40;
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -46,7 +45,6 @@ function initObstacles() {
 
 initObstacles();
 
-// Spawn health packs
 setInterval(() => {
     if (healthPacks.length < 20) {
         healthPacks.push({ 
@@ -57,7 +55,6 @@ setInterval(() => {
         io.emit('updateHealthPacks', healthPacks);
     }
     
-    // Respawn obstacles
     obstacles.forEach(ob => {
         if (ob.destroyed && Date.now() > ob.respawnTimer) {
             ob.destroyed = false;
@@ -67,9 +64,7 @@ setInterval(() => {
     });
 }, 5000);
 
-// Game loop - 60 FPS
 setInterval(() => {
-    // Update bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         b.x += b.dx; 
@@ -77,7 +72,6 @@ setInterval(() => {
         b.dist = (b.dist || 0) + Math.sqrt(b.dx**2 + b.dy**2);
         const maxDist = 400 + (b.rangeLvl * 100);
         
-        // Check obstacle collision
         let hitObstacle = false;
         for (let ob of obstacles) {
             if (!ob.destroyed && 
@@ -97,18 +91,16 @@ setInterval(() => {
         
         if (hitObstacle) continue;
         
-        // Check boundaries
         if (b.x < 0 || b.x > MAP_SIZE || b.y < 0 || b.y > MAP_SIZE || b.dist > maxDist) {
             bullets.splice(i, 1);
             continue;
         }
         
-        // Check player collision - НЕ ВЛУЧАЙ В СЕБЕ!
         for (let id in players) {
             let p = players[id];
             if (!p.isDead && id !== b.owner && 
-                b.x > p.x && b.x < p.x + TANK_SIZE && 
-                b.y > p.y && b.y < p.y + TANK_SIZE) {
+                b.x > p.x && b.x < p.x + 40 && 
+                b.y > p.y && b.y < p.y + 40) {
                 
                 const damage = b.damage || 20;
                 p.hp -= damage;
@@ -130,15 +122,14 @@ setInterval(() => {
         }
     }
     
-    // Check health pack pickup
     for (let id in players) {
         let p = players[id];
         if (p.isDead) continue;
         
         for (let i = healthPacks.length - 1; i >= 0; i--) {
             const hp = healthPacks[i];
-            if (p.x < hp.x + 30 && p.x + TANK_SIZE > hp.x && 
-                p.y < hp.y + 30 && p.y + TANK_SIZE > hp.y) {
+            if (p.x < hp.x + 30 && p.x + 40 > hp.x && 
+                p.y < hp.y + 30 && p.y + 40 > hp.y) {
                 if (p.hp < 100) {
                     p.hp = Math.min(100, p.hp + 40);
                     healthPacks.splice(i, 1);
@@ -188,19 +179,17 @@ io.on('connection', (socket) => {
         if (players[socket.id] && !players[socket.id].isDead) {
             let canMove = true;
             
-            // Check obstacle collision
             for(let ob of obstacles) {
                 if(!ob.destroyed && 
-                   data.x < ob.x + 40 && data.x + TANK_SIZE > ob.x && 
-                   data.y < ob.y + 40 && data.y + TANK_SIZE > ob.y) {
+                   data.x < ob.x + 40 && data.x + 40 > ob.x && 
+                   data.y < ob.y + 40 && data.y + 40 > ob.y) {
                     canMove = false; 
                     break;
                 }
             }
             
-            // Check boundaries
-            if (data.x < 0 || data.x > MAP_SIZE - TANK_SIZE || 
-                data.y < 0 || data.y > MAP_SIZE - TANK_SIZE) {
+            if (data.x < 0 || data.x > MAP_SIZE - 40 || 
+                data.y < 0 || data.y > MAP_SIZE - 40) {
                 canMove = false;
             }
             
@@ -249,7 +238,7 @@ io.on('connection', (socket) => {
     socket.on('ping_server', () => socket.emit('pong_server'));
 });
 
-// Auth endpoint - ВИПРАВЛЕНО РЕЄСТРАЦІЮ!
+// РЕЄСТРАЦІЯ - ПЕРЕВІРКА + СТВОРЕННЯ
 app.post('/auth', (req, res) => {
     const { username, password, type } = req.body;
     
@@ -269,10 +258,10 @@ app.post('/auth', (req, res) => {
                 return res.json({ success: false, message: 'Нікнейм вже зайнятий!' });
             }
             
-            // Створення нового користувача з ВСІМА полями
+            // СТВОРЕННЯ нового користувача з ВСІМА полями
             db.query(`INSERT INTO users (username, password, coins, score, speed_lvl, range_lvl, fire_rate_lvl, damage_lvl) 
                       VALUES (?, ?, 0, 0, 1, 1, 1, 1)`, 
-                [username, password], (err) => {
+                [username, password], (err, result) => {
                 if (err) {
                     res.json({ success: false, message: 'Помилка реєстрації' });
                 } else {
@@ -295,7 +284,6 @@ app.post('/auth', (req, res) => {
     }
 });
 
-// Upgrade endpoint
 app.post('/upgrade', (req, res) => {
     const { username, stat } = req.body;
     const cost = 100;
@@ -310,7 +298,6 @@ app.post('/upgrade', (req, res) => {
     });
 });
 
-// Set avatar endpoint
 app.post('/set-avatar', (req, res) => {
     const { username, url } = req.body;
     db.query('UPDATE users SET photo = ? WHERE username = ?', [url, username], () => {
@@ -321,5 +308,4 @@ app.post('/set-avatar', (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🎮 Server running on port ${PORT}`);
-    console.log(`🗺️ Map size: ${MAP_SIZE}x${MAP_SIZE}`);
 });
