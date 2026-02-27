@@ -7,6 +7,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 const MAP_SIZE = 2000;
 const OBSTACLE_COUNT = 40;
+const TANK_SIZE = 40;
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -21,20 +22,13 @@ const db = mysql.createConnection({
 
 db.connect((err) => {
     if(err) console.log('DB Error:', err);
-    else console.log('MySQL Connected');
+    else console.log('✅ MySQL Connected');
 });
 
 let players = {};
 let bullets = [];
 let healthPacks = [];
-let coinPacks = [];
 let obstacles = [];
-
-const TANK_TYPES = {
-    basic: { name: 'Базовий', speed: 4, damage: 20, hp: 100, fireRate: 600, color: '#4CAF50', price: 0 },
-    fast: { name: 'Швидкий', speed: 6, damage: 15, hp: 80, fireRate: 500, color: '#2196F3', price: 500 },
-    heavy: { name: 'Важкий', speed: 3, damage: 35, hp: 150, fireRate: 800, color: '#FF5722', price: 1000 }
-};
 
 function initObstacles() {
     for (let i = 0; i < OBSTACLE_COUNT; i++) {
@@ -52,25 +46,15 @@ function initObstacles() {
 
 initObstacles();
 
-// Spawn health packs and coins
+// Spawn health packs
 setInterval(() => {
-    if (healthPacks.length < 15) {
+    if (healthPacks.length < 20) {
         healthPacks.push({ 
             id: Math.random(), 
             x: Math.random() * (MAP_SIZE - 100) + 50, 
             y: Math.random() * (MAP_SIZE - 100) + 50 
         });
         io.emit('updateHealthPacks', healthPacks);
-    }
-    
-    if (coinPacks.length < 10) {
-        coinPacks.push({ 
-            id: Math.random(), 
-            x: Math.random() * (MAP_SIZE - 100) + 50, 
-            y: Math.random() * (MAP_SIZE - 100) + 50,
-            amount: Math.floor(Math.random() * 20) + 10
-        });
-        io.emit('updateCoinPacks', coinPacks);
     }
     
     // Respawn obstacles
@@ -119,12 +103,12 @@ setInterval(() => {
             continue;
         }
         
-        // Check player collision (FIXED - don't hit yourself)
+        // Check player collision - НЕ ВЛУЧАЙ В СЕБЕ!
         for (let id in players) {
             let p = players[id];
             if (!p.isDead && id !== b.owner && 
-                b.x > p.x && b.x < p.x + 40 && 
-                b.y > p.y && b.y < p.y + 40) {
+                b.x > p.x && b.x < p.x + TANK_SIZE && 
+                b.y > p.y && b.y < p.y + TANK_SIZE) {
                 
                 const damage = b.damage || 20;
                 p.hp -= damage;
@@ -146,16 +130,15 @@ setInterval(() => {
         }
     }
     
-    // Check pickups
+    // Check health pack pickup
     for (let id in players) {
         let p = players[id];
         if (p.isDead) continue;
         
-        // Health packs
         for (let i = healthPacks.length - 1; i >= 0; i--) {
             const hp = healthPacks[i];
-            if (p.x < hp.x + 30 && p.x + 40 > hp.x && 
-                p.y < hp.y + 30 && p.y + 40 > hp.y) {
+            if (p.x < hp.x + 30 && p.x + TANK_SIZE > hp.x && 
+                p.y < hp.y + 30 && p.y + TANK_SIZE > hp.y) {
                 if (p.hp < 100) {
                     p.hp = Math.min(100, p.hp + 40);
                     healthPacks.splice(i, 1);
@@ -164,49 +147,28 @@ setInterval(() => {
                 }
             }
         }
-        
-        // Coin packs
-        for (let i = coinPacks.length - 1; i >= 0; i--) {
-            const cp = coinPacks[i];
-            if (p.x < cp.x + 30 && p.x + 40 > cp.x && 
-                p.y < cp.y + 30 && p.y + 40 > cp.y) {
-                p.coins += cp.amount;
-                coinPacks.splice(i, 1);
-                db.query('UPDATE users SET coins = coins + ? WHERE username = ?', [cp.amount, p.username]);
-                io.emit('updateCoinPacks', coinPacks);
-                io.emit('updatePlayers', players);
-            }
-        }
     }
     
     io.emit('updateBullets', bullets);
 }, 1000 / 60);
 
 io.on('connection', (socket) => {
-    console.log('Player connected:', socket.id);
+    console.log('✅ Player connected:', socket.id);
     socket.emit('updateObstacles', obstacles);
     socket.emit('updateHealthPacks', healthPacks);
-    socket.emit('updateCoinPacks', coinPacks);
     
     socket.on('joinGame', (user) => {
         const startX = Math.random() * (MAP_SIZE - 100) + 50;
         const startY = Math.random() * (MAP_SIZE - 100) + 50;
         
-        const tankType = TANK_TYPES[user.tankType] || TANK_TYPES.basic;
-        
         players[socket.id] = { 
             id: socket.id, 
             username: user.username,
-            tankType: user.tankType || 'basic',
             x: startX, 
             y: startY, 
-            hp: tankType.hp,
-            maxHp: tankType.hp,
+            hp: 100,
+            maxHp: 100,
             isDead: false,
-            speed: tankType.speed,
-            damage: tankType.damage,
-            fireRate: tankType.fireRate,
-            color: tankType.color,
             coins: user.coins || 0,
             score: user.score || 0,
             speed_lvl: user.speed_lvl || 1,
@@ -218,29 +180,27 @@ io.on('connection', (socket) => {
         
         io.emit('updatePlayers', players);
         io.emit('gameState', { 
-            coins: players[socket.id].coins,
-            tankType: players[socket.id].tankType
+            coins: players[socket.id].coins 
         });
     });
     
     socket.on('move', (data) => {
         if (players[socket.id] && !players[socket.id].isDead) {
             let canMove = true;
-            const size = 40;
             
             // Check obstacle collision
             for(let ob of obstacles) {
                 if(!ob.destroyed && 
-                   data.x < ob.x + 40 && data.x + size > ob.x && 
-                   data.y < ob.y + 40 && data.y + size > ob.y) {
+                   data.x < ob.x + 40 && data.x + TANK_SIZE > ob.x && 
+                   data.y < ob.y + 40 && data.y + TANK_SIZE > ob.y) {
                     canMove = false; 
                     break;
                 }
             }
             
             // Check boundaries
-            if (data.x < 0 || data.x > MAP_SIZE - size || 
-                data.y < 0 || data.y > MAP_SIZE - size) {
+            if (data.x < 0 || data.x > MAP_SIZE - TANK_SIZE || 
+                data.y < 0 || data.y > MAP_SIZE - TANK_SIZE) {
                 canMove = false;
             }
             
@@ -256,7 +216,7 @@ io.on('connection', (socket) => {
         if (players[socket.id] && !players[socket.id].isDead) {
             const p = players[socket.id];
             const now = Date.now();
-            const cooldown = Math.max(200, p.fireRate - (p.fire_rate_lvl * 50));
+            const cooldown = Math.max(200, 600 - (p.fire_rate_lvl * 60));
             
             if (now - (p.lastShot || 0) < cooldown) return;
             p.lastShot = now;
@@ -265,15 +225,14 @@ io.on('connection', (socket) => {
                 ...data, 
                 owner: socket.id, 
                 rangeLvl: p.range_lvl,
-                damage: p.damage + (p.damage_lvl * 5)
+                damage: 20 + (p.damage_lvl * 5)
             });
         }
     });
     
     socket.on('respawn', () => {
         if (players[socket.id]) {
-            const tankType = TANK_TYPES[players[socket.id].tankType] || TANK_TYPES.basic;
-            players[socket.id].hp = tankType.hp;
+            players[socket.id].hp = 100;
             players[socket.id].isDead = false;
             players[socket.id].x = Math.random() * (MAP_SIZE - 100) + 50;
             players[socket.id].y = Math.random() * (MAP_SIZE - 100) + 50;
@@ -282,7 +241,7 @@ io.on('connection', (socket) => {
     });
     
     socket.on('disconnect', () => { 
-        console.log('Player disconnected:', socket.id);
+        console.log('❌ Player disconnected:', socket.id);
         delete players[socket.id]; 
         io.emit('updatePlayers', players); 
     });
@@ -290,7 +249,7 @@ io.on('connection', (socket) => {
     socket.on('ping_server', () => socket.emit('pong_server'));
 });
 
-// Auth endpoint
+// Auth endpoint - ВИПРАВЛЕНО РЕЄСТРАЦІЮ!
 app.post('/auth', (req, res) => {
     const { username, password, type } = req.body;
     
@@ -304,26 +263,34 @@ app.post('/auth', (req, res) => {
             }
         });
     } else {
-        db.query('INSERT INTO users (username, password, coins, score, speed_lvl, range_lvl, fire_rate_lvl, damage_lvl, tankType) VALUES (?, ?, 0, 0, 1, 1, 1, 1, ?)', 
-            [username, password, 'basic'], (err) => {
-            if (err) {
-                res.json({ success: false, message: 'Нікнейм вже зайнятий' });
-            } else {
-                res.json({ 
-                    success: true, 
-                    user: { 
-                        username, 
-                        score: 0, 
-                        coins: 0, 
-                        speed_lvl: 1, 
-                        range_lvl: 1, 
-                        fire_rate_lvl: 1,
-                        damage_lvl: 1,
-                        tankType: 'basic',
-                        photo: null 
-                    } 
-                });
+        // ПЕРЕВІРКА чи існує нікнейм
+        db.query('SELECT * FROM users WHERE username = ?', [username], (err, results) => {
+            if (results && results.length > 0) {
+                return res.json({ success: false, message: 'Нікнейм вже зайнятий!' });
             }
+            
+            // Створення нового користувача з ВСІМА полями
+            db.query(`INSERT INTO users (username, password, coins, score, speed_lvl, range_lvl, fire_rate_lvl, damage_lvl) 
+                      VALUES (?, ?, 0, 0, 1, 1, 1, 1)`, 
+                [username, password], (err) => {
+                if (err) {
+                    res.json({ success: false, message: 'Помилка реєстрації' });
+                } else {
+                    res.json({ 
+                        success: true, 
+                        user: { 
+                            username, 
+                            score: 0, 
+                            coins: 0, 
+                            speed_lvl: 1, 
+                            range_lvl: 1, 
+                            fire_rate_lvl: 1,
+                            damage_lvl: 1,
+                            photo: null 
+                        } 
+                    });
+                }
+            });
         });
     }
 });
@@ -343,31 +310,6 @@ app.post('/upgrade', (req, res) => {
     });
 });
 
-// Buy tank endpoint
-app.post('/buy-tank', (req, res) => {
-    const { username, tankType } = req.body;
-    const tank = TANK_TYPES[tankType];
-    
-    if (!tank) {
-        return res.json({ success: false, message: 'Невірний тип танку' });
-    }
-    
-    if (tank.price === 0) {
-        db.query('UPDATE users SET tankType = ? WHERE username = ?', [tankType, username], () => {
-            res.json({ success: true });
-        });
-    } else {
-        db.query('UPDATE users SET tankType = ?, coins = coins - ? WHERE username = ? AND coins >= ?', 
-            [tankType, tank.price, username, tank.price], (err, result) => {
-            if (result && result.affectedRows > 0) {
-                res.json({ success: true });
-            } else {
-                res.json({ success: false, message: 'Недостатньо монет' });
-            }
-        });
-    }
-});
-
 // Set avatar endpoint
 app.post('/set-avatar', (req, res) => {
     const { username, url } = req.body;
@@ -379,4 +321,5 @@ app.post('/set-avatar', (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🎮 Server running on port ${PORT}`);
+    console.log(`🗺️ Map size: ${MAP_SIZE}x${MAP_SIZE}`);
 });
