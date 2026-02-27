@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tanks Evolution Pro - Premium Battle</title>
+    <title>Tanks Evolution Pro</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,18 +16,17 @@
                 <input type="password" id="password" placeholder="Пароль">
             </div>
             <div class="button-group">
-                <button onclick="auth('login')" class="btn-primary">Увійти</button>
+                <button onclick="auth('login')">Увійти</button>
                 <button onclick="auth('register')" class="btn-alt">Реєстрація</button>
             </div>
             <div class="about-section">
                 <h3>🎯 Про гру</h3>
-                <p>Вітаємо в <b>Tanks Evolution Pro</b>! Епічні битви, боси та преміум нагороди!</p>
+                <p>Вітаємо в <b>Tanks Evolution Pro</b>! Це динамічний багатокористувацький екшн.</p>
                 <ul>
-                    <li>🎮 5 унікальних танків</li>
-                    <li>👾 Боси з преміум нагородами</li>
-                    <li>💰 Монети та прокачування</li>
-                    <li>⚡ Покращена графіка</li>
-                    <li>🏆 ТОП гравців</li>
+                    <li>🎯 Стріляйте за курсором миші</li>
+                    <li>🧱 Руйнуйте перешкоди (3 попадання)</li>
+                    <li>🛠 Прокачуйте швидкість та скорострільність</li>
+                    <li>❤️ Збирайте аптечки для відновлення</li>
                 </ul>
             </div>
         </div>
@@ -38,20 +37,14 @@
         <div id="pingDisplay">Ping: 0ms</div>
         
         <div id="topBar">
-            <div class="currency">
-                <span class="coin">🪙 <span id="coinCount">0</span></span>
-                <span class="premium">💎 <span id="premiumCount">0</span></span>
-            </div>
-            <button onclick="showShop()">🛒 Магазин</button>
-            <button onclick="showUpgrades()">⚡ Прокачка</button>
-            <button onclick="showTanks()">🎨 Танки</button>
-            <div id="playerStats"></div>
+            <span id="stats">Монети: 0</span>
+            <button onclick="upgrade('speed_lvl')">⚡ Швидкість</button>
+            <button onclick="upgrade('fire_rate_lvl')">🔥 КД</button>
+            <input type="text" id="avatarUrl" placeholder="URL фото" style="width:80px">
+            <button onclick="setAvatar()">OK</button>
         </div>
         
-        <div id="leaderboard">
-            <h3>🏆 ТОП 5</h3>
-            <div id="leaderboardList"></div>
-        </div>
+        <div id="leaderboard"></div>
         
         <canvas id="gameCanvas"></canvas>
         
@@ -59,66 +52,20 @@
         <div id="mobileControls">
             <div class="dpad">
                 <button id="moveUp">↑</button>
-                <div class="dpad-row">
+                <div>
                     <button id="moveLeft">←</button>
                     <button id="moveDown">↓</button>
                     <button id="moveRight">→</button>
                 </div>
             </div>
-            <button id="btnFire">🔥 FIRE</button>
+            <button id="btnFire">FIRE</button>
         </div>
         
         <!-- Respawn Menu -->
         <div id="respawnMenu" style="display:none">
-            <h2>💀 ВАС ЗНИЩЕНО!</h2>
-            <p>Не здавайтесь!</p>
-            <button onclick="respawn()" class="btn-respawn">🔄 В БІЙ!</button>
+            <h2>💀 ТЕБЕ ЗНИЩЕНО!</h2>
+            <button onclick="respawn()" style="font-size:24px">🔄 В БІЙ!</button>
         </div>
-    </div>
-
-    <!-- Shop Modal -->
-    <div id="shopModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('shopModal')">&times;</span>
-            <h2>🛒 МАГАЗИН ТАНКІВ</h2>
-            <div id="tankShop"></div>
-        </div>
-    </div>
-
-    <!-- Upgrades Modal -->
-    <div id="upgradeModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('upgradeModal')">&times;</span>
-            <h2>⚡ ПРОКАЧУВАННЯ</h2>
-            <div class="upgrade-grid">
-                <div class="upgrade-card" onclick="upgrade('speed_lvl')">
-                    <h3>⚡ Швидкість</h3>
-                    <p>Рівень: <span id="speedLvl">1</span></p>
-                    <button class="btn-upgrade">Покращити (100🪙)</button>
-                </div>
-                <div class="upgrade-card" onclick="upgrade('fire_rate_lvl')">
-                    <h3>🔥 Скорострільність</h3>
-                    <p>Рівень: <span id="fireRateLvl">1</span></p>
-                    <button class="btn-upgrade">Покращити (100🪙)</button>
-                </div>
-                <div class="upgrade-card" onclick="upgrade('damage_lvl')">
-                    <h3>💥 Урон</h3>
-                    <p>Рівень: <span id="damageLvl">1</span></p>
-                    <button class="btn-upgrade">Покращити (100🪙)</button>
-                </div>
-                <div class="upgrade-card" onclick="upgrade('range_lvl')">
-                    <h3>🎯 Дальність</h3>
-                    <p>Рівень: <span id="rangeLvl">1</span></p>
-                    <button class="btn-upgrade">Покращити (100🪙)</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Boss Alert -->
-    <div id="bossAlert" class="boss-alert" style="display:none">
-        <h2>⚠️ БОС НАБЛИЖАЄТЬСЯ! ⚠️</h2>
-        <p>Нагорода: 500🪙 + 100💎</p>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
