@@ -10,11 +10,9 @@ let obstacles = [];
 let keys = {};
 
 const MAP_SIZE = 2000;
-const TANK_SIZE = 40;
 let lastShot = 0;
 let ping = 0;
 
-// Resize canvas
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -22,7 +20,6 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// Ping system
 setInterval(() => {
     const start = Date.now();
     socket.emit('ping_server');
@@ -32,7 +29,6 @@ setInterval(() => {
     });
 }, 2000);
 
-// Auth function
 async function auth(type) {
     const u = document.getElementById('username').value.trim();
     const p = document.getElementById('password').value.trim();
@@ -67,7 +63,6 @@ async function auth(type) {
     }
 }
 
-// Shooting - ВИПРАВЛЕНО: куля спавниться ЗОВНІ танку!
 function handleShoot(clientX, clientY) {
     const me = players[socket.id];
     if (!me || me.isDead) return;
@@ -80,7 +75,7 @@ function handleShoot(clientX, clientY) {
     
     const angle = Math.atan2(clientY - canvas.height/2, clientX - canvas.width/2);
     
-    // Спавн кулі на 30px далі від центру танку
+    // Куля спавниться ЗОВНІ танку (30px від центру)
     socket.emit('shoot', {
         x: me.x + 20 + Math.cos(angle) * 30,
         y: me.y + 20 + Math.sin(angle) * 30,
@@ -93,7 +88,6 @@ canvas.addEventListener('mousedown', (e) => {
     handleShoot(e.clientX, e.clientY);
 });
 
-// Keyboard controls
 window.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
 });
@@ -102,16 +96,13 @@ window.addEventListener('keyup', e => {
     keys[e.key.toLowerCase()] = false;
 });
 
-// Game loop
 function gameLoop() {
-    // Clear screen
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     const me = players[socket.id];
     
     if (me) {
-        // Movement
         if (!me.isDead) {
             let speed = 4 + (me.speed_lvl * 0.7);
             let nextX = me.x;
@@ -130,11 +121,9 @@ function gameLoop() {
             }
         }
         
-        // Camera transform
         ctx.save();
         ctx.translate(canvas.width / 2 - me.x, canvas.height / 2 - me.y);
         
-        // Draw grid
         ctx.strokeStyle = 'rgba(255,255,255,0.05)';
         ctx.lineWidth = 1;
         for (let i = 0; i <= MAP_SIZE; i += 100) {
@@ -148,12 +137,10 @@ function gameLoop() {
             ctx.stroke();
         }
         
-        // Draw map borders
         ctx.strokeStyle = '#ff0000';
         ctx.lineWidth = 5;
         ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
         
-        // Draw health packs
         healthPacks.forEach(hp => {
             ctx.fillStyle = '#ff4444';
             ctx.fillRect(hp.x, hp.y, 30, 30);
@@ -163,7 +150,6 @@ function gameLoop() {
             ctx.fillText('+', hp.x + 15, hp.y + 24);
         });
         
-        // Draw obstacles
         obstacles.forEach(ob => {
             if (!ob.destroyed) {
                 const gradient = ctx.createLinearGradient(ob.x, ob.y, ob.x + 40, ob.y + 40);
@@ -176,50 +162,41 @@ function gameLoop() {
                 ctx.lineWidth = 2;
                 ctx.strokeRect(ob.x, ob.y, 40, 40);
                 
-                // HP indicator
                 ctx.fillStyle = '#ff0000';
                 ctx.fillRect(ob.x + 5, ob.y - 10, (ob.hp / ob.maxHp) * 30, 5);
             }
         });
         
-        // Draw ALL players
         for (let id in players) {
             const p = players[id];
             if (p.isDead) continue;
             
             const isMe = id === socket.id;
             
-            // Tank shadow
             ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.fillRect(p.x + 3, p.y + 3, TANK_SIZE, TANK_SIZE);
+            ctx.fillRect(p.x + 3, p.y + 3, 40, 40);
             
-            // Tank body
             ctx.fillStyle = isMe ? '#00ff00' : '#ff4444';
-            ctx.fillRect(p.x, p.y, TANK_SIZE, TANK_SIZE);
+            ctx.fillRect(p.x, p.y, 40, 40);
             
-            // Tank border
             ctx.strokeStyle = isMe ? '#00ff00' : '#ff0000';
             ctx.lineWidth = 3;
-            ctx.strokeRect(p.x, p.y, TANK_SIZE, TANK_SIZE);
+            ctx.strokeRect(p.x, p.y, 40, 40);
             
-            // Tank turret
             ctx.fillStyle = '#333';
             ctx.fillRect(p.x + 15, p.y + 15, 10, 10);
             
-            // Username
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(p.username, p.x + 20, p.y - 10);
             
-            // HP bar
             ctx.fillStyle = '#000';
-            ctx.fillRect(p.x, p.y - 5, TANK_SIZE, 5);
+            ctx.fillRect(p.x, p.y - 5, 40, 5);
             ctx.fillStyle = p.hp > 50 ? '#00ff00' : p.hp > 25 ? '#ffff00' : '#ff0000';
-            ctx.fillRect(p.x, p.y - 5, (p.hp / 100) * TANK_SIZE, 5);
+            ctx.fillRect(p.x, p.y - 5, (p.hp / 100) * 40, 5);
         }
         
-        // Draw bullets
         bullets.forEach(b => {
             ctx.fillStyle = '#ffff00';
             ctx.beginPath();
@@ -233,20 +210,17 @@ function gameLoop() {
         
         ctx.restore();
         
-        // Update UI
         document.getElementById('stats').innerText = 
             `🪙 ${currentUser.coins || 0} | 🎯 ${me.score || 0} | ❤️ ${Math.floor(me.hp)}`;
         document.getElementById('pingDisplay').innerText = `Ping: ${ping}ms`;
         document.getElementById('respawnMenu').style.display = me.isDead ? 'block' : 'none';
         
-        // Update leaderboard
         updateLeaderboard();
     }
     
     requestAnimationFrame(gameLoop);
 }
 
-// Update leaderboard
 function updateLeaderboard() {
     const sorted = Object.values(players)
         .sort((a, b) => (b.score || 0) - (a.score || 0))
@@ -263,7 +237,6 @@ function updateLeaderboard() {
     document.getElementById('leaderboard').innerHTML = '<h3>🏆 ТОП 5</h3>' + html;
 }
 
-// Socket events
 socket.on('updatePlayers', data => {
     for (let id in data) {
         if (id !== socket.id) {
@@ -305,7 +278,6 @@ socket.on('gameState', data => {
     }
 });
 
-// Upgrade function
 async function upgrade(stat) {
     if (!currentUser) return;
     
@@ -355,7 +327,6 @@ function setAvatar() {
     });
 }
 
-// Mobile controls
 document.getElementById('moveUp')?.addEventListener('touchstart', (e) => { 
     e.preventDefault(); 
     keys['w'] = true; 
