@@ -1,74 +1,70 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tanks Evolution Pro</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tanks Evolution Pro 3D</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Auth Container -->
-    <div id="authContainer">
-        <div id="loginPanel">
-            <h1>🎮 TANKS.IO</h1>
-            <div class="input-group">
-                <input type="text" id="username" placeholder="Нікнейм">
-                <input type="password" id="password" placeholder="Пароль">
-            </div>
-            <div class="button-group">
-                <button onclick="auth('login')">Увійти</button>
-                <button onclick="auth('register')" class="btn-alt">Реєстрація</button>
-            </div>
-            <div class="about-section">
-                <h3>🎯 Про гру</h3>
-                <p>Вітаємо в <b>Tanks Evolution Pro</b>! Це динамічний багатокористувацький екшн.</p>
-                <ul>
-                    <li>🎯 Стріляйте за курсором миші</li>
-                    <li>🧱 Руйнуйте перешкоди (3 попадання)</li>
-                    <li>🛠 Прокачуйте швидкість та скорострільність</li>
-                    <li>❤️ Збирайте аптечки для відновлення</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <!-- Game UI -->
-    <div id="gameUI" style="display:none">
-        <div id="pingDisplay">Ping: 0ms</div>
-        
-        <div id="topBar">
-            <span id="stats">Монети: 0</span>
-            <button onclick="upgrade('speed_lvl')">⚡ Швидкість</button>
-            <button onclick="upgrade('fire_rate_lvl')">🔥 КД</button>
-            <input type="text" id="avatarUrl" placeholder="URL фото" style="width:80px">
-            <button onclick="setAvatar()">OK</button>
-        </div>
-        
-        <div id="leaderboard"></div>
-        
-        <canvas id="gameCanvas"></canvas>
-        
-        <!-- Mobile Controls -->
-        <div id="mobileControls">
-            <div class="dpad">
-                <button id="moveUp">↑</button>
-                <div>
-                    <button id="moveLeft">←</button>
-                    <button id="moveDown">↓</button>
-                    <button id="moveRight">→</button>
-                </div>
-            </div>
-            <button id="btnFire">FIRE</button>
-        </div>
-        
-        <!-- Respawn Menu -->
-        <div id="respawnMenu" style="display:none">
-            <h2>💀 ТЕБЕ ЗНИЩЕНО!</h2>
-            <button onclick="respawn()" style="font-size:24px">🔄 В БІЙ!</button>
-        </div>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="game.js"></script>
+<div id="authContainer">
+<div id="loginPanel">
+<h1>🎮 TANKS.IO 3D</h1>
+<div class="input-group">
+<input type="text" id="username" placeholder="Нікнейм">
+<input type="password" id="password" placeholder="Пароль">
+</div>
+<div class="button-group">
+<button onclick="auth('login')">Увійти</button>
+<button onclick="auth('register')" class="btn-alt">Реєстрація</button>
+</div>
+<div class="about-section">
+<h3>🎯 Про гру</h3>
+<p>Вітаємо в <b>Tanks Evolution Pro 3D</b>! Це динамічний багатокористувацький екшн з 3D графікою.</p>
+<ul>
+<li>🎮 3D графіка як в Brawl Stars</li>
+<li>🎯 Стріляйте за курсором миші (WASD - рух)</li>
+<li>👹 Бос кожні 5 хвилин (+500 монет)</li>
+<li>🧱 Руйнуйте перешкоди (3 попадання)</li>
+<li>⚡ Прокачуйте швидкість, шкоду, скорострільність</li>
+<li>❤️ Збирайте аптечки для відновлення</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="gameUI" style="display:none">
+<div id="pingDisplay">Ping: 0ms</div>
+<div id="bossWarning" style="display:none; position:absolute; top:60px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg, #ff416c, #ff4b2b); color:white; padding:15px 30px; border-radius:10px; font-weight:bold; font-size:18px; z-index:10; box-shadow:0 5px 20px rgba(255,0,0,0.5);">
+⚠️ БОСС З'ЯВИВСЯ!
+</div>
+<div id="topBar">
+<span id="stats">Монети: 0</span>
+<button onclick="upgrade('speed_lvl')" title="100 монет">⚡ Швидкість</button>
+<button onclick="upgrade('fire_rate_lvl')" title="150 монет">🎯 КД</button>
+<button onclick="upgrade('damage_lvl')" title="200 монет">💥 Шкода</button>
+<button onclick="upgrade('range_lvl')" title="100 монет">📏 Дальність</button>
+<input type="text" id="avatarUrl" placeholder="URL фото" style="width:80px">
+<button onclick="setAvatar()">OK</button>
+</div>
+<div id="leaderboard"></div>
+<canvas id="gameCanvas"></canvas>
+<div id="mobileControls">
+<div class="dpad">
+<button id="moveUp">↑</button>
+<div>
+<button id="moveLeft">←</button>
+<button id="moveDown">↓</button>
+<button id="moveRight">→</button>
+</div>
+</div>
+<button id="btnFire">FIRE</button>
+</div>
+<div id="respawnMenu" style="display:none">
+<h2>💀 ТЕБЕ ЗНИЩЕНО!</h2>
+<button onclick="respawn()" style="font-size:24px">🔄 В БІЙ!</button>
+</div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
