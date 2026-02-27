@@ -8,20 +8,17 @@ let bullets = [];
 let healthPacks = [];
 let coinPacks = [];
 let obstacles = [];
-let bosses = [];
 let keys = {};
 let mouse = { x: 0, y: 0 };
 
-const MAP_SIZE = 3000;
+const MAP_SIZE = 2000;
 let lastShot = 0;
 let ping = 0;
 
 const TANK_TYPES = {
     basic: { name: 'Базовий', speed: 4, damage: 20, hp: 100, fireRate: 600, color: '#4CAF50', price: 0 },
     fast: { name: 'Швидкий', speed: 6, damage: 15, hp: 80, fireRate: 500, color: '#2196F3', price: 500 },
-    heavy: { name: 'Важкий', speed: 3, damage: 35, hp: 150, fireRate: 800, color: '#FF5722', price: 1000 },
-    sniper: { name: 'Снайпер', speed: 4, damage: 50, hp: 70, fireRate: 1200, color: '#9C27B0', price: 1500 },
-    premium: { name: 'Преміум', speed: 5, damage: 30, hp: 120, fireRate: 550, color: '#FFD700', price: 3000 }
+    heavy: { name: 'Важкий', speed: 3, damage: 35, hp: 150, fireRate: 800, color: '#FF5722', price: 1000 }
 };
 
 // Resize canvas
@@ -77,7 +74,7 @@ async function auth(type) {
     }
 }
 
-// Shooting
+// Shooting - FIXED: spawn bullet outside player
 function handleShoot(clientX, clientY) {
     const me = players[socket.id];
     if (!me || me.isDead) return;
@@ -91,11 +88,12 @@ function handleShoot(clientX, clientY) {
     
     const angle = Math.atan2(clientY - canvas.height/2, clientX - canvas.width/2);
     
+    // Spawn bullet at tank turret (outside the tank body)
     socket.emit('shoot', {
-        x: me.x + 20,
-        y: me.y + 20,
-        dx: Math.cos(angle) * 10,
-        dy: Math.sin(angle) * 10
+        x: me.x + 20 + Math.cos(angle) * 30,  // 30px outside tank
+        y: me.y + 20 + Math.sin(angle) * 30,
+        dx: Math.cos(angle) * 12,
+        dy: Math.sin(angle) * 12
     });
 }
 
@@ -195,59 +193,20 @@ function gameLoop() {
         // Draw obstacles
         obstacles.forEach(ob => {
             if (!ob.destroyed) {
-                const gradient = ctx.createLinearGradient(ob.x, ob.y, ob.x + 60, ob.y + 60);
+                const gradient = ctx.createLinearGradient(ob.x, ob.y, ob.x + 40, ob.y + 40);
                 gradient.addColorStop(0, '#666');
                 gradient.addColorStop(1, '#333');
                 ctx.fillStyle = gradient;
-                ctx.fillRect(ob.x, ob.y, 60, 60);
+                ctx.fillRect(ob.x, ob.y, 40, 40);
                 
-                // Border
                 ctx.strokeStyle = '#888';
                 ctx.lineWidth = 2;
-                ctx.strokeRect(ob.x, ob.y, 60, 60);
+                ctx.strokeRect(ob.x, ob.y, 40, 40);
                 
                 // HP indicator
                 ctx.fillStyle = '#ff0000';
-                ctx.fillRect(ob.x + 5, ob.y - 10, (ob.hp / ob.maxHp) * 50, 5);
+                ctx.fillRect(ob.x + 5, ob.y - 10, (ob.hp / ob.maxHp) * 30, 5);
             }
-        });
-        
-        // Draw bosses
-        bosses.forEach(boss => {
-            // Boss shadow
-            ctx.fillStyle = 'rgba(255,0,0,0.3)';
-            ctx.beginPath();
-            ctx.arc(boss.x + boss.size/2 + 5, boss.y + boss.size/2 + 5, boss.size/2, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Boss body
-            const gradient = ctx.createRadialGradient(
-                boss.x + boss.size/2, boss.y + boss.size/2, 0,
-                boss.x + boss.size/2, boss.y + boss.size/2, boss.size/2
-            );
-            gradient.addColorStop(0, '#ff4444');
-            gradient.addColorStop(1, '#8b0000');
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(boss.x + boss.size/2, boss.y + boss.size/2, boss.size/2, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Boss border
-            ctx.strokeStyle = '#ff0000';
-            ctx.lineWidth = 4;
-            ctx.stroke();
-            
-            // Boss HP bar
-            ctx.fillStyle = '#000';
-            ctx.fillRect(boss.x, boss.y - 20, boss.size, 10);
-            ctx.fillStyle = '#ff0000';
-            ctx.fillRect(boss.x, boss.y - 20, (boss.currentHp / boss.hp) * boss.size, 10);
-            
-            // Boss label
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('👾 БОС', boss.x + boss.size/2, boss.y - 25);
         });
         
         // Draw players
@@ -288,39 +247,19 @@ function gameLoop() {
             ctx.fillStyle = '#000';
             ctx.fillRect(p.x, p.y - 5, 40, 5);
             ctx.fillStyle = p.hp > 50 ? '#00ff00' : p.hp > 25 ? '#ffff00' : '#ff0000';
-            ctx.fillRect(p.x, p.y - 5, (p.hp / (tankType.hp + (p.speed_lvl * 10))) * 40, 5);
-            
-            // Premium indicator
-            if (p.premium > 0) {
-                ctx.fillStyle = '#FFD700';
-                ctx.font = '12px Arial';
-                ctx.fillText('💎', p.x + 20, p.y + 55);
-            }
+            ctx.fillRect(p.x, p.y - 5, (p.hp / p.maxHp) * 40, 5);
         }
         
         // Draw bullets
         bullets.forEach(b => {
-            if (b.isBossBullet) {
-                // Boss bullet
-                ctx.fillStyle = '#ff0000';
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, 8, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#ff8800';
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
-                ctx.fill();
-            } else {
-                // Regular bullet
-                ctx.fillStyle = '#ffff00';
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#ffaa00';
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffaa00';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+            ctx.fill();
         });
         
         ctx.restore();
@@ -344,16 +283,9 @@ function darkenColor(color, percent) {
 
 // Update UI
 function updateUI(me) {
-    document.getElementById('coinCount').innerText = me.coins || 0;
-    document.getElementById('premiumCount').innerText = me.premium || 0;
-    document.getElementById('speedLvl').innerText = me.speed_lvl || 1;
-    document.getElementById('fireRateLvl').innerText = me.fire_rate_lvl || 1;
-    document.getElementById('damageLvl').innerText = me.damage_lvl || 1;
-    document.getElementById('rangeLvl').innerText = me.range_lvl || 1;
-    
-    document.getElementById('playerStats').innerText = 
-        `🎯 Рахунок: ${me.score || 0} | ❤️ HP: ${Math.floor(me.hp)}`;
-    
+    document.getElementById('stats').innerText = 
+        `🪙 ${me.coins || 0} | 🎯 ${me.score || 0} | ❤️ ${Math.floor(me.hp)}`;
+    document.getElementById('pingDisplay').innerText = `Ping: ${ping}ms`;
     document.getElementById('respawnMenu').style.display = me.isDead ? 'block' : 'none';
     
     // Update leaderboard
@@ -364,13 +296,13 @@ function updateUI(me) {
 function updateLeaderboard() {
     const sorted = Object.values(players).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 5);
     const html = sorted.map((p, i) => `
-        <div class="leaderboard-item ${i === 0 ? 'first' : ''}">
-            <span class="rank">${i + 1}</span>
-            <span class="name">${p.username}</span>
-            <span class="score">${p.score || 0}</span>
+        <div style="padding: 5px; margin: 3px 0; background: rgba(255,255,255,0.1); border-radius: 5px;">
+            <span style="color: ${i === 0 ? '#FFD700' : 'white'}">
+                ${i + 1}. ${p.username}: ${p.score || 0}
+            </span>
         </div>
     `).join('');
-    document.getElementById('leaderboardList').innerHTML = html;
+    document.getElementById('leaderboard').innerHTML = '<h3>🏆 ТОП 5</h3>' + html;
 }
 
 // Socket events
@@ -383,7 +315,7 @@ socket.on('updatePlayers', data => {
             Object.assign(players[id], data[id]);
             if (currentUser) {
                 currentUser.coins = data[id].coins;
-                currentUser.premium = data[id].premium;
+                currentUser.score = data[id].score;
             }
         }
     }
@@ -405,88 +337,11 @@ socket.on('updateObstacles', data => {
     obstacles = data;
 });
 
-socket.on('updateBosses', data => {
-    bosses = data;
-    if (bosses.length > 0) {
-        showBossAlert();
-    }
-});
-
-socket.on('bossDefeated', data => {
-    showNotification('🎉 БОСА ЗНИЩЕНО! +500🪙 +100💎');
-});
-
 socket.on('gameState', data => {
     if (currentUser) {
         currentUser.coins = data.coins;
-        currentUser.premium = data.premium;
-        currentUser.tankType = data.tankType;
     }
 });
-
-// Shop functions
-function showShop() {
-    const shopDiv = document.getElementById('tankShop');
-    let html = '<div class="tank-grid">';
-    
-    for (let [key, tank] of Object.entries(TANK_TYPES)) {
-        const owned = currentUser && currentUser.tankType === key;
-        html += `
-            <div class="tank-card ${owned ? 'owned' : ''}">
-                <div class="tank-preview" style="background:${tank.color}"></div>
-                <h3>${tank.name}</h3>
-                <div class="tank-stats">
-                    <p>⚡ Швидкість: ${tank.speed}</p>
-                    <p>💥 Урон: ${tank.damage}</p>
-                    <p>❤️ HP: ${tank.hp}</p>
-                    <p>🔥 КД: ${tank.fireRate}ms</p>
-                </div>
-                ${owned ? 
-                    '<button class="btn-equipped" disabled>Обрано</button>' : 
-                    `<button class="btn-buy" onclick="buyTank('${key}', ${tank.price})">
-                        ${tank.price === 0 ? 'Безкоштовно' : tank.price + '🪙'}
-                    </button>`
-                }
-            </div>
-        `;
-    }
-    html += '</div>';
-    
-    shopDiv.innerHTML = html;
-    document.getElementById('shopModal').style.display = 'block';
-}
-
-async function buyTank(tankType, price) {
-    if (!currentUser) return;
-    
-    if (price > 0 && currentUser.coins < price) {
-        alert('Недостатньо монет!');
-        return;
-    }
-    
-    try {
-        const res = await fetch('/buy-tank', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: currentUser.username, tankType })
-        });
-        
-        const data = await res.json();
-        if (data.success) {
-            currentUser.tankType = tankType;
-            if (price > 0) {
-                currentUser.coins -= price;
-            }
-            showNotification('Танк успішно придбано!');
-            showShop();
-        } else {
-            alert(data.message);
-        }
-    } catch (err) {
-        console.error('Buy error:', err);
-        alert('Помилка покупки');
-    }
-}
 
 // Upgrade function
 async function upgrade(stat) {
@@ -508,8 +363,7 @@ async function upgrade(stat) {
         if (data.success) {
             currentUser[stat] = (currentUser[stat] || 1) + 1;
             currentUser.coins -= 100;
-            showNotification('Покращено! -100🪙');
-            updateUI(players[socket.id] || currentUser);
+            alert('Покращено! -100🪙');
         } else {
             alert(data.message || 'Помилка прокачування');
         }
@@ -519,50 +373,120 @@ async function upgrade(stat) {
     }
 }
 
-function showUpgrades() {
-    document.getElementById('upgradeModal').style.display = 'block';
-}
-
-function showTanks() {
-    showShop();
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
-}
-
 function respawn() {
     socket.emit('respawn');
 }
 
-function showBossAlert() {
-    const alert = document.getElementById('bossAlert');
-    alert.style.display = 'block';
-    setTimeout(() => {
-        alert.style.display = 'none';
-    }, 5000);
+function setAvatar() {
+    const url = document.getElementById('avatarUrl').value;
+    if (!url) return alert('Введіть URL');
+    
+    fetch('/set-avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser.username, url })
+    }).then(() => { 
+        currentUser.photo = url;
+        alert('Аватарку збережено!');
+    });
 }
 
-function showNotification(text) {
-    const notif = document.createElement('div');
-    notif.className = 'notification';
-    notif.innerText = text;
-    notif.style.cssText = `
-        position: fixed;
-        top: 100px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0,255,0,0.9);
-        color: white;
-        padding: 15px 30px;
-        border-radius: 10px;
-        z-index: 1000;
-        font-weight: bold;
-        animation: slideDown 0.3s ease;
+// Show shop
+function showShop() {
+    let html = '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px;">';
+    
+    for (let [key, tank] of Object.entries(TANK_TYPES)) {
+        const owned = currentUser && currentUser.tankType === key;
+        html += `
+            <div style="background: rgba(0,0,0,0.7); border: 2px solid ${owned ? '#00ff00' : tank.color}; 
+                        border-radius: 10px; padding: 15px; text-align: center;">
+                <div style="width: 80px; height: 80px; background: ${tank.color}; margin: 0 auto 10px; 
+                            border-radius: 10px; border: 3px solid #fff;"></div>
+                <h3 style="color: ${tank.color}">${tank.name}</h3>
+                <p>⚡ Швидкість: ${tank.speed}</p>
+                <p>💥 Урон: ${tank.damage}</p>
+                <p>❤️ HP: ${tank.hp}</p>
+                ${owned ? 
+                    '<button style="background: #00ff00; color: #000; padding: 10px; border: none; border-radius: 5px; cursor: default;">Обрано</button>' : 
+                    `<button onclick="buyTank('${key}', ${tank.price})" 
+                              style="background: ${tank.price === 0 ? '#00ff00' : '#FFD700'}; color: #000; 
+                                     padding: 10px; border: none; border-radius: 5px; cursor: pointer;">
+                        ${tank.price === 0 ? 'Безкоштовно' : tank.price + '🪙'}
+                    </button>`
+                }
+            </div>
+        `;
+    }
+    html += '</div>';
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'shopModal';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.9); z-index: 1000;
+        display: flex; justify-content: center; align-items: center;
     `;
-    document.body.appendChild(notif);
-    setTimeout(() => notif.remove(), 3000);
+    modal.innerHTML = `
+        <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); 
+                    border: 3px solid #00ff00; border-radius: 20px; 
+                    max-width: 900px; width: 90%; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; 
+                        padding: 20px; border-bottom: 2px solid #00ff00;">
+                <h2 style="color: #00ff00; margin: 0;">🛒 МАГАЗИН ТАНКІВ</h2>
+                <button onclick="this.closest('#shopModal').remove()" 
+                        style="background: none; border: none; color: #fff; 
+                               font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            ${html}
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
 }
+
+// Buy tank
+async function buyTank(tankType, price) {
+    if (!currentUser) return;
+    
+    if (price > 0 && currentUser.coins < price) {
+        alert('Недостатньо монет!');
+        return;
+    }
+    
+    try {
+        const res = await fetch('/buy-tank', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser.username, tankType })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+            currentUser.tankType = tankType;
+            if (price > 0) {
+                currentUser.coins -= price;
+            }
+            alert('Танк успішно придбано!');
+            document.getElementById('shopModal')?.remove();
+            showShop();
+        } else {
+            alert(data.message);
+        }
+    } catch (err) {
+        console.error('Buy error:', err);
+        alert('Помилка покупки');
+    }
+}
+
+// Add shop button to topBar
+window.addEventListener('load', () => {
+    const topBar = document.getElementById('topBar');
+    const shopBtn = document.createElement('button');
+    shopBtn.innerText = '🛒 Магазин';
+    shopBtn.onclick = showShop;
+    topBar.appendChild(shopBtn);
+});
 
 // Mobile controls
 document.getElementById('moveUp')?.addEventListener('touchstart', (e) => { e.preventDefault(); keys['w'] = true; });
@@ -577,10 +501,3 @@ document.getElementById('btnFire')?.addEventListener('touchstart', (e) => {
     e.preventDefault();
     handleShoot(canvas.width/2 + 50, canvas.height/2);
 });
-
-// Close modals on outside click
-window.onclick = function(event) {
-    if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
-    }
-}
